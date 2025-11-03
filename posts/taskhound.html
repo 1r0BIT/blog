@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Spotlight: TaskHound - r0bit's blog</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div id="quote-container"></div>
+        </header>
+
+        <nav>
+            <p>[ <a href="../index.html">home</a> | <a href="../posts.html">posts</a> | <a href="../toolshed.html">toolshed</a> | <a href="../whoami.html">whoami</a> ]</p>
+        </nav>
+
+        <main>
+        <article>
+            <h1>tool spotlight: taskhound</h1>
+            <p class="meta">Posted on November 3 2025 | ~20 min read</p>
+
+            <div class="prelude">
+                <h3># TL;DR</h3>
+                <p>Searching for privileged Scheduled Tasks in Windows systems and documenting them during pentests was tedious and often incomplete. Until now (hopefully). Join me on the journey of someone who can't code. Like really can't code. Armed with theoretical knowledge, vscode + Copilot, curiosity a deeply internalized fear of reading SchedTask XMLs at 2am.</p>
+            </div>
+
+            <h2>## intro and background</h2>
+            <p>Every now and then (often) during our pentests, we come across scheduled tasks on compromised Windows systems that run in the context of privileged users and whose passwords are stored on the system.</p>
+            
+            <p>When we inform the client about this and show them how quickly this will punch holes in their carefully constructed tiering concept, the same question usually follows:</p>
+
+            <p style="text-align: center; font-style: italic; margin: 2em 0;"><strong>"Was that all of them, or are there more?"</strong></p>
+
+            <p>Finding the answer to that question usually ends up with unleashing a whole armada of PowerShell or Python scripts of questionable origin through the domain, collecting all task XMLs, triggering the next flood of scripts to parse the information, only to end up with CSV files that are just as confusing. Sounds like fun, right?</p>
+
+            <p>From a purely offensive perspective, it doesn't get any better. Imagine this scenario: You've already compromised about 20 machines and are looking for ways to use them for a complete domain takeover. To avoid having to read dozens of scheduled task XMLs, you just blindly throw a DPAPI dump at everything you've compromised so far and hope for the best.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="taskhound/img/random_bullshit_go.jpeg" alt="Random Bullshit Go meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+            
+            <p>Even in the rare case that this works, there are still more questions left unanswered:</p>
+
+            <ul style="margin-left: 2em;">
+                <li>Is the user whose context the task runs in even a "High-Value" target?</li>
+                <li>Is the stored password of the user in the scheduled task still valid?</li>
+            </ul>
+
+            <br>
+
+            <p>This is exactly where I wanted to start. To make my nights (and others') in front of the computer easier, where you have to read texts like this 100 times and then rightfully question your career choices:</p>
+
+
+            <pre class="line-numbers"><code class="language-xml">&lt;?xml version="1.0" encoding="UTF-16"?&gt;
+&lt;Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"&gt;
+  &lt;RegistrationInfo&gt;
+    &lt;Date&gt;2025-09-18T23:04:37.3089851&lt;/Date&gt;
+    &lt;Author&gt;DEMO\Administrator&lt;/Author&gt;
+    &lt;URI&gt;\HIGH_VAL_WITH_CREDS&lt;/URI&gt;
+  &lt;/RegistrationInfo&gt;
+  &lt;Triggers&gt;
+    &lt;CalendarTrigger&gt;
+      &lt;StartBoundary&gt;2025-09-18T23:04:16&lt;/StartBoundary&gt;
+      &lt;Enabled&gt;true&lt;/Enabled&gt;
+      &lt;ScheduleByDay&gt;
+        &lt;DaysInterval&gt;1&lt;/DaysInterval&gt;
+      &lt;/ScheduleByDay&gt;
+    &lt;/CalendarTrigger&gt;
+  &lt;/Triggers&gt;
+  &lt;Principals&gt;
+    &lt;Principal id="Author"&gt;
+      &lt;RunLevel&gt;HighestAvailable&lt;/RunLevel&gt;
+      &lt;UserId&gt;DEMO\Administrator&lt;/UserId&gt;
+      &lt;LogonType&gt;Password&lt;/LogonType&gt;
+    &lt;/Principal&gt;
+  &lt;/Principals&gt;
+  &lt;Settings&gt;
+    &lt;MultipleInstancesPolicy&gt;IgnoreNew&lt;/MultipleInstancesPolicy&gt;
+    &lt;DisallowStartIfOnBatteries&gt;true&lt;/DisallowStartIfOnBatteries&gt;
+    &lt;StopIfGoingOnBatteries&gt;true&lt;/StopIfGoingOnBatteries&gt;
+    &lt;AllowHardTerminate&gt;true&lt;/AllowHardTerminate&gt;
+    &lt;StartWhenAvailable&gt;false&lt;/StartWhenAvailable&gt;
+    &lt;RunOnlyIfNetworkAvailable&gt;false&lt;/RunOnlyIfNetworkAvailable&gt;
+    &lt;IdleSettings&gt;
+      &lt;StopOnIdleEnd&gt;true&lt;/StopOnIdleEnd&gt;
+      &lt;RestartOnIdle&gt;false&lt;/RestartOnIdle&gt;
+    &lt;/IdleSettings&gt;
+    &lt;AllowStartOnDemand&gt;true&lt;/AllowStartOnDemand&gt;
+    &lt;Enabled&gt;true&lt;/Enabled&gt;
+    &lt;Hidden&gt;false&lt;/Hidden&gt;
+    &lt;RunOnlyIfIdle&gt;false&lt;/RunOnlyIfIdle&gt;
+    &lt;WakeToRun&gt;false&lt;/WakeToRun&gt;
+    &lt;ExecutionTimeLimit&gt;P3D&lt;/ExecutionTimeLimit&gt;
+    &lt;Priority&gt;7&lt;/Priority&gt;
+  &lt;/Settings&gt;
+  &lt;Actions Context="Author"&gt;
+    &lt;Exec&gt;
+      &lt;Command&gt;C:\Windows\System32\cmd.exe&lt;/Command&gt;
+      &lt;Arguments&gt;/c whoami&lt;/Arguments&gt;
+    &lt;/Exec&gt;
+  &lt;/Actions&gt;
+&lt;/Task&gt;</code></pre>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="taskhound/img/life_choices.jpg" alt="Questioning life choices meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <h2>## introducing: taskhound</h2>
+            <p><strong>Windows Privileged Scheduled Task Discovery Tool for fun and profit.</strong></p>
+
+            <p>TaskHound hunts for Windows scheduled tasks that run with privileged accounts and stored credentials. It enumerates tasks over SMB, parses XMLs, and identifies high-value attack opportunities through BloodHound export support.</p>
+
+            <h2>## workflow and features</h2>
+            <p>The basic workflow is pretty straightforward:</p>
+
+            <pre><code>                             +----------------------+     +---------------------+
+                             |    SMB Connection    | --> | Local Admin Rights? |
+                             +----------------------+     +---------------------+
+                                                                      |
+                                                                      v
+                             +----------------------+     +----------------------+
+                             |     XML Parsing      | <-- |  Collect Tasks/Blobs |
+                             +----------------------+     +----------------------+
+                                         |
+                                         v
+                             +----------------------+     +----------------------+
+                             |     Filter Logic     | --> |  High Value Analysis |
+                             +----------------------+     +----------------------+
+                                                                     |
+                                                                     v
+                                                          +----------------------+
+                                                          |        Output        |
+                                                          +----------------------+</code></pre>
+
+
+            <br>
+            <p>We use previously obtained local admin credentials to mount the <code>C$</code> share on the target system, navigate to <code>C:\Windows\System32\Tasks</code>, recursively grab everything in there, throw the results into a parser, and analyze various fields that are interesting to us:</p>
+
+            <h3>### core task enumeration</h3>
+            <p>The task collection happens over SMB using Impacket:</p>
+            
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/tasks.py#L42-L70" target="_blank" style="color: #89b4fa;">taskhound/smb/tasks.py, lines 42-70</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def crawl_tasks(smb: SMBConnection, include_ms: bool = False) -> List[Tuple[str, bytes]]:
+    # Recursively crawl the scheduled tasks tree and collect XMLs.
+    #
+    # By default the large \Microsoft subtree is skipped for speed unless
+    # `include_ms` is True.
+    results: List[Tuple[str, bytes]] = []
+    share = "C$"
+
+    def recurse(cur: str):
+        for is_dir, name in smb_listdir(smb, share, cur):
+            # skip Microsoft subtree for speed unless explicitly asked
+            if (not include_ms) and name.lower() == "microsoft" and cur.lower().endswith("windows\\system32\\tasks"):
+                continue
+            full = cur + "\\" + name
+            if is_dir:
+                recurse(full)
+            else:
+                try:
+                    data = smb_readfile(smb, share, full)
+                    # remove leading backslash for normalized relative path
+                    rel = full[1:] if full.startswith("\\") else full
+                    results.append((rel, data))
+                except Exception as e:
+                    # Non-fatal: log and continue
+                    warn(f"Failed to read {full}: {e}")
+
+    try:
+        recurse(TASK_ROOT)
+    except Exception as e:
+        warn(f"Failed to enumerate tasks: {e}")
+    
+    return results</code></pre>
+
+            <h3>### xml parsing logic</h3>
+            <p>Each task XML gets parsed to extract the fields we care about for privilege analysis:</p>
+            
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/parsers/task_xml.py#L12-L50" target="_blank" style="color: #89b4fa;">taskhound/parsers/task_xml.py, lines 12-50</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def parse_task_xml(xml_bytes: bytes) -> Dict[str, str]:
+    res = {"runas": None, "author": None, "date": None, "command": None, "arguments": None, "logon_type": None, "enabled": None,
+           "trigger_type": None, "start_boundary": None, "interval": None, "duration": None, "days_interval": None}
+    try:
+        root = ET.fromstring(xml_bytes)
+        # Handle default namespace if present by binding it to prefix 'ns'
+        # Task Scheduler XML typically uses http://schemas.microsoft.com/windows/2004/02/mit/task
+        ns = {}
+        if root.tag.startswith('{'):
+            namespace_uri = root.tag.split('}')[0].strip('{')
+            ns = {"ns": namespace_uri}
+
+        def grab(path):
+            # Try with namespace first, then without
+            node = root.find(path, ns) if ns else None
+            if node is None:
+                # Fallback: try without namespace
+                fallback_path = path.replace('ns:', '')
+                node = root.find(fallback_path)
+            return node.text.strip() if (node is not None and node.text) else None
+
+        # Principal/UserId holds the account the task runs as
+        res["runas"]     = grab(".//ns:Principal/ns:UserId")
+        res["author"]    = grab(".//ns:RegistrationInfo/ns:Author")
+        res["date"]      = grab(".//ns:RegistrationInfo/ns:Date")
+        # Command and Arguments can be nested under different nodes in some schemas;
+        # this covers the common Task Scheduler schema used by Windows.
+        res["command"]   = grab(".//ns:Command")
+        res["arguments"] = grab(".//ns:Arguments")
+        # LogonType indicates whether credentials are stored (Password) or if S4U/token is used
+        res["logon_type"] = grab(".//ns:Principal/ns:LogonType")
+
+        # Task state information - critical for identifying disabled tasks that may still store credentials
+        res["enabled"]   = grab(".//ns:Settings/ns:Enabled")
+        
+    except Exception as e:
+        warn(f"Failed to parse task XML: {e}")
+    
+    return res</code></pre>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.5em; text-align: left; border: 1px solid #45475a;">Field Name</th>
+                        <th style="padding: 0.5em; text-align: left; border: 1px solid #45475a;">Purpose</th>
+                        <th style="padding: 0.5em; text-align: left; border: 1px solid #45475a;">Possible Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>UserId</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">The user account under which the task runs</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">DOMAIN\User<br>SID<br>SamAccountName</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>Command</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">The executable or script that the task starts</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">C:\Windows\System32\cmd.exe</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>Arguments</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Command-line parameters passed to the command</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">/c whoami</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>LogonType</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Determines whether credentials are stored or not</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Password<br>InteractiveToken<br>S4U</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>Author</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Who created/registered the task</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">DOMAIN\User<br>SID<br>SamAccountName</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>Date</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Creation date of the task</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Timestamp</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;"><code>Enabled</code></td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Indicator whether the task is still active or not</td>
+                        <td style="padding: 0.5em; border: 1px solid #45475a;">Boolean (True/False)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p style="font-style: italic;">And more...</p>
+
+            <p>The results are then filtered according to a defined rule set, where some tasks are skipped by default:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Filter Criteria</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Tasks under <code>C:\Windows\System32\Tasks\Windows</code></strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">This is where Windows default tasks live by default, which are rarely of particular value from an attacker's perspective.</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Tasks without stored passwords (<code>LogonType != Password</code>)</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">These tasks run automatically at the scheduled time, but only if the responsible user is also logged in at that time.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Tasks running in the context of local entities</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">SID S-1-5-18 aka LocalSystem is an example. These tasks run with NT\SYSTEM privileges, but only locally on the machine. Since we already need local admin rights to use TaskHound anyway, this is only interesting in edge cases.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>As soon as the processing is complete and tasks have ideally been identified whose password is stored in the system, we get to the actual core piece of the tool: BloodHound integration.</p>
+
+            <h2>## bloodhound integration</h2>
+            <p>TaskHound offers various ways to prepare the collected tasks and specifically filter for high-value targets.</p>
+
+            <p>There are several ways to integrate the data:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Integration Method</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Live DB Connector</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Direct database queries (Legacy&BHCE) for real-time high-value target identification</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Offline Ingestion</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">By parsing previously generated exports</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>BloodHound OpenGraph Integration</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">For visual preparation of results. Generates native BloodHound nodes and relationships for graph-based analysis</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>The workflow after ingestion is usually independent of the data source used: We map the <code>UserId</code> and <code>LogonType</code> of a task and can derive from this whether a task is particularly interesting to us as attackers or whether it's rather trivial data.</p>
+
+            <p>Up to this point, the core functionality of TaskHound was already working surprisingly well in smaller lab environments and development setups. The basic task enumeration, XML parsing, and filtering logic proved solid for typical scenarios.</p>
+
+            <p>However, things kinda nosedived when I tried TaskHound against larger and overall more complex Active Directory environments during actual engagements. Not only did I encounter edge cases like cross-domain tasks that would break half the parsing logic and make adapting the tool an absolute nightmare, but the sheer amount of tasks in some environments made it challenging to filter out what was operationally valuable. The real problem became not only <em>finding</em> scheduled tasks with stored credentials, but also <em>understanding their significance</em> within the broader attack surface of the domain.</p>
+
+            <p>That's when the idea of full BloodHound integration really started to form. Simply dumping a summary with task names, privilege classification and user accounts wasn't enough, neither for me nor for the customers. I wanted visual context, relationship mapping, and most importantly, a way to identify which of these tasks actually represented meaningful privilege escalation opportunities.</p>
+
+            <h3>### enter: opengraph</h3>
+            <p>You can't imagine how long I've dreamed of something like this. BloodHound's ability to visualize complex Active Directory relationships was already a game changer. But being able to create custom nodes and edges without jumping through hoops? And making it accessible to others without <em>them</em> having to jump through the same hoops? That's just <em>priceless</em>.</p>
+            <p>TaskHound uses the official <a href="https://pypi.org/project/bhopengraph/" target="_blank" style="color: #cba6f7;"><code>bhopengraph</code></a> library by <a href="https://github.com/p0dalirius" target="_blank" style="color: #cba6f7;">@p0dalirius</a> to generate type-safe, schema-validated graph data:</p>
+            <p>For now, we add the following new node and edge types to the BloodHound schema:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Type</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Name</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Brief Explanation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Node</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>ScheduledTask</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Represents the scheduled tasks themselves with properties like command, enabled status, and credential storage info</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Edge</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>HasTask</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Links computers to their scheduled tasks (Computer → ScheduledTask)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Edge</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>HasTaskWithStoredCreds</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Special edge for tasks that have stored credentials, enabling privilege escalation queries</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><strong>Edge</strong></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>RunsAs</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Maps scheduled tasks to the user accounts they run as (ScheduledTask → User)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Here's how the nodes and edges get generated from the SchedTask data:</p>
+            
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/feature/opengraph-integration/taskhound/output/opengraph.py#L273-L320" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 273-320</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def generate_opengraph_files(output_dir: str, tasks: List[Dict],
+                            bh_api_url: Optional[str] = None,
+                            bh_username: Optional[str] = None,
+                            bh_password: Optional[str] = None,
+                            ldap_config: Optional[Dict] = None) -> str:
+    """
+    Main function to generate OpenGraph file using bhopengraph library.
+
+    :param output_dir: The directory to write the JSON file to.
+    :param tasks: A list of task dictionaries from the TaskHound engine.
+    :param bh_api_url: BloodHound API URL for objectId resolution (optional)
+    :param bh_username: BloodHound username for API authentication (optional)
+    :param bh_password: BloodHound password for API authentication (optional)
+    :param ldap_config: LDAP configuration for fallback resolution (optional)
+    :return: Path to the generated OpenGraph file
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Create a single OpenGraph instance for both nodes and edges
+    # Don't use source_kind to avoid adding it to stub Computer/User nodes
+    graph = OpenGraph()
+
+    # Create and add task nodes
+    skipped_nodes = 0
+    for task in tasks:
+        try:
+            node = _create_task_node(task)
+            graph.add_node(node)
+        except ValueError as e:
+            warn(f"Skipping invalid task: {e}")
+            skipped_nodes += 1
+    
+    if skipped_nodes > 0:
+        warn(f"Skipped {skipped_nodes} invalid tasks (missing host/path)")
+    
+    info(f"Created {graph.get_node_count()} ScheduledTask nodes")</code></pre>
+
+            <p>The actual node creation with all the properties happens in the <code>_create_task_node</code> helper function:</p>
+            
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L409-L506" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 409-506</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def _create_task_node(task: Dict) -> Node:
+    """
+    Creates a single ScheduledTask node using bhopengraph.
+    
+    :param task: Task dictionary from TaskHound engine
+    :return: Node instance
+    :raises ValueError: If required fields are missing or invalid
+    """
+    hostname = task.get("host", "").strip().upper()
+    task_path = task.get("path", "").strip()
+    
+    # Validate required fields
+    if not hostname or not task_path:
+        raise ValueError(f"Task missing required fields")
+    
+    # Create a unique object ID using hash to prevent collisions
+    object_id = _create_task_object_id(hostname, task_path)
+
+    # Build command string
+    command = task.get("command", "N/A")
+    arguments = task.get("arguments")
+    if arguments:
+        command = f"{command} {arguments}"
+
+    # Build properties dict - bhopengraph Properties class validates schema compliance
+    properties_dict = {
+        "name": task_path,
+        "hostname": hostname,
+        "objectid": object_id,
+        "runas": task.get("runas") or "N/A",
+        "enabled": str(task.get("enabled", "false")).lower() == "true",
+        "command": command,
+        "logontype": task.get("logon_type") or "Unknown",
+        "credentialsstored": task.get("credentials_hint") == "stored_credentials",
+    }
+
+    # Create Node using bhopengraph (automatically validates schema)
+    node = Node(
+        id=object_id,
+        kinds=["scheduledtask", "Base", "TaskHound"],
+        properties=Properties(**properties_dict)
+    )
+    
+    return node</code></pre>
+
+            <div style="background-color: #313244; border-left: 4px solid #f9e2af; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
+                <p style="margin: 0; color: #f9e2af; font-weight: bold;"> note</p>
+                <p style="margin: 0.5em 0 0 0;">One hurdle was the correct object ID resolution. Since the unique identifier used to be the SID as far as I remember (in Legacy BloodHound), I thought it would be the same for BHCE. Well. I was wrong. BHCE uses an internal node_id, which we need to get from the API before we can successfully map it. This is still a work in progress and will be fixed eventually. More on that in the Roadmap section.</p>
+            </div>
+
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L66-L130" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 66-130</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def resolve_object_ids_chunked(
+    computer_names: Set[str],
+    user_names: Set[str],
+    bh_api_url: str,
+    bh_token: str,
+    ldap_config: Optional[Dict] = None,
+    chunk_size: int = 10
+) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """
+    Resolve computer and user names to their objectIds (SIDs) using BloodHound API.
+    Falls back to LDAP if API queries fail.
+    """
+    def _chunk_list(items: Set[str], size: int) -> List[List[str]]:
+        """Split set into chunks of specified size."""
+        items_list = sorted(list(items))  # Sort for consistent ordering
+        return [items_list[i:i + size] for i in range(0, len(items_list), size)]
+    
+    def _query_bloodhound_chunk(names: List[str], node_type: str) -> Dict[str, str]:
+        """Query BloodHound API for a chunk of names."""
+        mapping = {}
+        
+        # Build Cypher query with WHERE IN clause
+        names_list_str = ', '.join([f'"{name}"' for name in names])
+        query = f'MATCH (n:{node_type}) WHERE n.name IN [{names_list_str}] RETURN n'
+        
+        try:
+            response = requests.post(
+                f"{bh_api_url}/api/v2/graphs/cypher",
+                headers={
+                    "Authorization": f"Bearer {bh_token}",
+                    "Content-Type": "application/json"
+                },
+                json={"query": query},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                nodes = data.get("data", {}).get("nodes", {})
+                
+                # Extract name -> objectId mappings
+                for node_id, node in nodes.items():
+                    name = node.get("label")  
+                    object_id = node.get("objectId")
+                    
+                    if name and object_id:
+                        mapping[name] = object_id
+                
+                return mapping
+        except Exception as e:
+            warn(f"BloodHound API query failed: {e}")
+            return {}
+    
+    # Process computers and users in chunks
+    # ... (implementation continues with chunked processing)
+    return computer_sid_map, user_sid_map</code></pre>
+
+                <h3>### cypher queries</h3>
+            <p>Once the data is imported into BloodHound, you can use Cypher queries to analyze the attack paths. Here's a basic query to get you started (More will be added to the documentation in the git repo):</p>
+
+            <pre class="line-numbers"><code class="language-sql">// Find all computers that have ScheduledTasks with stored credentials 
+// and the user context they run as
+    MATCH p = (c:Computer)-[:HasTaskWithStoredCreds]->(t:scheduledtask)-[:RunsAs]->(u)
+    RETURN p</code></pre>
+
+            <p> This will (hopefully) result in something like this:</p>
+                        <p style="text-align: center; margin: 1.5em 0;">
+                <img src="taskhound/img/opengraph_bloodhound.jpeg" alt="TaskHound BloodHound integration screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <h2>## in action</h2>
+            <p>Here's what it looks like when you run it:</p>
+
+            <p style="text-align: center; margin: 1.5em 0;">
+                <img src="taskhound/img/taskhound_init.png" alt="TaskHound initialization screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+            
+            <p style="text-align: center; margin: 1.5em 0;">
+                <img src="taskhound/img/opengraph_collect.png" alt="TaskHound collecting data screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+            
+            <p style="text-align: center; margin: 1.5em 0;">
+                <img src="taskhound/img/taskhound_summary.png" alt="TaskHound summary screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+                        <p style="text-align: center; margin: 2em 0;">
+                <img src="taskhound/img/but_wait_theres_more.jpeg" alt="But wait there's more meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+            <h2>## extras</h2>
+            <h3>### dpapi integration</h3>
+            <p>Another neat convenience feature is automatic DPAPI credential extraction. Shoutout to <a href="https://x.com/xct_de">xct</a> for the suggestion. When TaskHound finds tasks with stored passwords, it can automatically dump and decrypt the credential blobs (Given that you acquired the DPAPI SYSTEM key somehow without making the SOC light up like a christmas tree). Of course you can also just grab the blobs and store them for later decryption. I would have loved to integrate some sort of association between blobs and their respective tasks without having to decrypt them first. But this is left as an exercise for the reader.</p>
+            
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/dpapi/looter.py#L108-L140" target="_blank" style="color: #89b4fa;">taskhound/dpapi/looter.py, lines 108-140</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def _decrypt_all_credentials(self) -> None:
+    """Download and decrypt all credential blobs from systemprofile"""
+    try:
+        cred_path = "Windows\\System32\\config\\systemprofile\\AppData\\Local\\Microsoft\\Credentials\\"
+
+        # List credential files
+        files = self.smb_conn.listPath("C$", cred_path + "*")
+        cred_files = [
+            f.get_longname()
+            for f in files
+            if f.get_longname() not in ['.', '..'] and f.get_filesize() < 10000
+        ]
+
+        logging.info(f"[*] Found {len(cred_files)} credential blobs to decrypt")
+
+        # Decrypt each credential file
+        for cred_file in cred_files:
+            try:
+                # Download credential file
+                buffer = BytesIO()
+                self.smb_conn.getFile("C$", cred_path + cred_file, buffer.write)
+                cred_bytes = buffer.getvalue()
+
+                # Decrypt with DPAPI
+                result = self.decryptor.decrypt_credential_blob(
+                    blob_bytes=cred_bytes,
+                    task_name="",  # Will be filled in later during association
+                    blob_path=cred_file
+                )
+
+                if result and result.username:
+                    self.credentials.append(result)
+                    logging.debug(f"Decrypted credential: {result.username} from blob {cred_file}")
+                else:
+                    logging.debug(f"Failed to decrypt blob {cred_file} (no matching masterkey?)")
+
+            except Exception as e:
+                logging.debug(f"Error decrypting {cred_file}: {e}")
+
+    except Exception as e:
+        logging.error(f"Failed to decrypt credentials: {e}")</code></pre>
+
+            <p>And for all of you who care about OPSEC, there's also a matching <strong><a href="https://github.com/1r0BIT/TaskHound/tree/main/BOF" target="_blank"><code>Beacon Object File (BOF)</code></a></strong> with the essential core functions (Connect, Crawl, Parse, Backup).</p>
+
+            <p>The goal of the BOF is to be fully compatible with the offline functionality of TaskHound. So the output from the BOF can be directly ingested into TaskHound and turned into OpenGraph data.</p>
+            <p>It was primarily developed for AdaptixC2. However, all the BeaconAPIs used are compatible with Cobalt Strike. So it should be adaptable for other common C2 frameworks without too much effort.</p>
+            <p>The PR has already been merged and ships by default in the <strong><a href="https://github.com/Adaptix-Framework/Extension-Kit/" target="_blank"><code>Extension-Kit v0.10</code></a></strong>.</p>
+
+            <p style="text-align: center; margin: 1.5em 0;">
+                <img src="taskhound/img/taskhound_bof.png" alt="TaskHound BOF execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+
+            <p>For all pentests where stealth/OPSEC isn't that important or isn't a requirement: The PR for the matching <strong><a href="https://github.com/Pennyw0rth/NetExec/pull/933" target="_blank" style="color: #cba6f7;"><code>NetExec module</code></a></strong> is currently under review.</p>
+
+            <p style="text-align: center; margin: 1.5em 0;"></p>
+                <img src="taskhound/img/netexec.png" alt="TaskHound NetExec execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>    
+            <h2>## limitations</h2>
+            <p>As with pretty much everything that's fun, there are a few limitations with TaskHound too.</p>
+
+            <div style="margin: 1.5em 0;">
+                <p><strong>Password freshness check:</strong> Verifying whether the stored password of a scheduled task is still valid and therefore a DPAPI dump worthwhile is more difficult than expected. So far, there's only one reliable indicator: When the value of <code>PasswordLastChanged</code> in BloodHound is older than the <code>CreationDate</code> of the scheduled task.</p>
+
+                <p>There's no timestamp of the last modification in the task XML, and unfortunately when the password in the task is changed, the file metadata doesn't change either.</p>
+
+                <p>One idea would be to, for example, pull the Windows event logs from disk or query them via WMI and search through the task history to compare the timestamp of the last successful execution. <span style="font-style: italic; color: #6c7086;">#OverEngineering</span></p>
+
+                <p>If you have better ideas: Feel free to submit a pull request!</p>
+            </div>
+
+            <div style="margin: 1.5em 0;">
+                <p><strong>TIER-0 classification:</strong> The TIER-0 classification is currently still based on the standard TIER-0 groups or attributes in Active Directory (AdminSDHolder, Domain Admins, Enterprise Admins, etc.).</p>
+
+                <p>This is a limitation of Legacy BloodHound, which only knows "High Value" or not. BloodHound Community Edition at least makes a distinction in the attributes between <code>highvalue</code> and <code>isTierZero</code>, even if that doesn't seem to work quite right yet and I've implemented a rather odd solution for it. More on that in the following section.</p>
+            </div>
+
+            <h2>## hickups, hax and bloopers (i blame copilot)</h2>
+            <p>The following areas led to some major headaches and caused a lot of troubleshooting:</p>
+
+            <h3>### the xml namespace nightmare</h3>
+            <p>Scheduled task XMLs look straightforward until you realize they don't. Windows somehow uses different namespace conventions depending on the Task Scheduler version, system configuration, and sometimes just because it feels like it. Some XMLs have explicit namespaces, others don't. Some use different schemas entirely. Or the parsing was broken halfway through an iteration. I don't know anymore and I'm too afraid of XMLs to take another look.</p>
+            
+            <p>The parsing logic needs to handle both namespaced and non-namespaced XML gracefully, with fallback mechanisms for when namespace detection fails:</p>
+
+            <p><em>Source:</em> <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/parsers/task_xml.py#L17-L50" target="_blank">taskhound/parsers/task_xml.py#L17-L50</a></p>
+
+            <pre class="line-numbers"><code class="language-python">        # Handle default namespace if present by binding it to prefix 'ns'
+        # Task Scheduler XML typically uses http://schemas.microsoft.com/windows/2004/02/mit/task
+        ns = {}
+        if root.tag.startswith('{'):
+            namespace_uri = root.tag.split('}')[0].strip('{')
+            ns = {"ns": namespace_uri}
+
+        def grab(path):
+            # Try with namespace first, then without
+            node = root.find(path, ns) if ns else None
+            if node is None:
+                # Fallback: try without namespace
+                fallback_path = path.replace('ns:', '')
+                node = root.find(fallback_path)
+            return node.text.strip() if (node is not None and node.text) else None
+
+        # Principal/UserId holds the account the task runs as
+        res["runas"]     = grab(".//ns:Principal/ns:UserId")
+        res["author"]    = grab(".//ns:RegistrationInfo/ns:Author")
+        res["date"]      = grab(".//ns:RegistrationInfo/ns:Date")
+        # Command and Arguments can be nested under different nodes in some schemas;
+        # this covers the common Task Scheduler schema used by Windows.
+        res["command"]   = grab(".//ns:Command")
+        res["arguments"] = grab(".//ns:Arguments")
+        # LogonType indicates whether credentials are stored (Password) or if S4U/token is used
+        res["logon_type"] = grab(".//ns:Principal/ns:LogonType")
+
+        # Task state information - critical for identifying disabled tasks that may still store credentials
+        res["enabled"]   = grab(".//ns:Settings/ns:Enabled")
+
+        # Parse trigger information for schedule analysis
+        # Try to find the first trigger and determine its type and schedule
+        triggers_node = root.find(".//ns:Triggers", ns) if ns else root.find(".//Triggers")
+        if triggers_node is not None:
+            # Check for different trigger types in order of preference (CalendarTrigger is most detailed)
+            calendar_trigger = triggers_node.find("ns:CalendarTrigger", ns) if ns else triggers_node.find("CalendarTrigger")
+            time_trigger = triggers_node.find("ns:TimeTrigger", ns) if ns else triggers_node.find("TimeTrigger")
+            logon_trigger = triggers_node.find("ns:LogonTrigger", ns) if ns else triggers_node.find("LogonTrigger")</code></pre>
+
+            <p>And then there are the trigger types... CalendarTrigger, TimeTrigger, LogonTrigger, BootTrigger, IdleTrigger, EventTrigger, etc. Each with their own nested structure and optional elements. Fun times when you're trying to extract schedule information at 2 AM.</p>
+
+            <h3>### the thing with bhce and tier0</h3>
+            <p>BloodHound Community Edition has an interesting quirk (or I'm just too dumb to use it properly. Might as well be the case here): when you mark a user as "high value", it automatically assigns tier0 attributes. This creates a problem: Users who should be classified as <strong>PRIV</strong> tasks get misclassified as <strong>TIER-0</strong> because of these auto-assigned attributes.</p>
+            
+            <p>The solution requires checking not just the BHCE attributes, but also verifying <em>actual</em> membership in legitimate Tier-0 groups. Here's the hacky logic from <code>check_tier0()</code>:</p>
+
+            <p><em>Source:</em> <a href="https://github.com/1r0BIT/TaskHound/blob/feature/opengraph-integration/taskhound/parsers/highvalue.py#L634-L745" target="_blank">taskhound/parsers/highvalue.py#L634-L745</a></p>
+
+            <pre class="line-numbers"><code class="language-python">        # Check 1: Group membership verification (PRIMARY - most accurate)
+        # This works for both Legacy and BHCE and provides ground truth
+        group_sids = user_data.get("groups", [])  # This contains the actual SIDs
+        group_names = user_data.get("group_names", [])  # This contains display names
+
+        # Create a mapping of SID to display name for output
+        sid_to_name = {}
+        if len(group_sids) == len(group_names):
+            sid_to_name = dict(zip(group_sids, group_names))
+
+        matching_tier0_groups = []
+        has_actual_tier0_groups = False
+
+        for group_sid in group_sids:
+            group_sid_upper = group_sid.upper()
+
+            # Check against well-known Tier 0 SIDs
+            for tier0_sid_pattern, default_name in TIER0_SIDS.items():
+                if tier0_sid_pattern.startswith("S-1-5-21-{domain}"):
+                    # Domain-relative SID - extract the pattern
+                    # e.g., S-1-5-21-{domain}-512 matches S-1-5-21-1234567890-1234567890-1234567890-512
+                    rid = tier0_sid_pattern.split("-")[-1]  # Get the RID (512, 519, etc.)
+                    if group_sid_upper.startswith("S-1-5-21-") and group_sid_upper.endswith(f"-{rid}"):
+                        # Use the display name from BloodHound if available, otherwise use default
+                        display_name = sid_to_name.get(group_sid, default_name)
+                        matching_tier0_groups.append(display_name)
+                        has_actual_tier0_groups = True
+                        break
+                elif group_sid_upper == tier0_sid_pattern.upper():
+                    # Exact SID match (builtin groups like Administrators)
+                    display_name = sid_to_name.get(group_sid, default_name)
+                    matching_tier0_groups.append(display_name)
+                    has_actual_tier0_groups = True
+                    break
+
+        if has_actual_tier0_groups:
+            tier0_reasons.append("TIER0 Group Membership")
+
+        # Check 2: AdminSDHolder protection (admincount=1) - works for both formats
+        admincount = user_data.get("admincount")
+        if admincount and str(admincount).lower() in ("1", "true"):
+            tier0_reasons.append("AdminSDHolder")
+
+        # Check 3: BHCE-specific attributes (FALLBACK - only when no group data)
+        # This addresses the BHCE limitation where high-value auto-assigns tier0 tags
+        # IMPORTANT: Only classify as TIER-0 if we have AdminSDHolder OR actual group memberships
+        # Users with ONLY BHCE tags should be PRIV, not TIER-0
+        has_adminsd_holder = admincount and str(admincount).lower() in ("1", "true")
+
+        if not has_actual_tier0_groups and not has_adminsd_holder:
+            # User has BHCE tier0 tags but NO actual Tier-0 indicators
+            # This means they were marked as high-value and BHCE auto-assigned tier0 tags
+            # These should be classified as PRIV, not TIER-0
+            bhce_tier0_detected = False
+            if self.format_type == "bhce" and user_data.get("istierzero"):
+                bhce_tier0_detected = True
+
+            system_tags = user_data.get("system_tags", "")
+            if system_tags and "admin_tier_0" in system_tags:
+                bhce_tier0_detected = True
+
+            # DO NOT add to tier0_reasons - this makes them PRIV instead of TIER-0
+            # if bhce_tier0_detected:
+            #     tier0_reasons.append("BHCE Tier 0 attribute")
+
+        elif not has_actual_tier0_groups and has_adminsd_holder:
+            # User has AdminSDHolder but no group memberships detected
+            # Still include BHCE attribute for additional context
+            bhce_tier0_detected = False
+            if self.format_type == "bhce" and user_data.get("istierzero"):
+                bhce_tier0_detected = True
+
+            system_tags = user_data.get("system_tags", "")
+            if system_tags and "admin_tier_0" in system_tags:
+                bhce_tier0_detected = True
+
+            if bhce_tier0_detected:
+                tier0_reasons.append("BHCE Tier 0 attribute")
+
+        # Note: A user with high-value=true but NO actual Tier-0 groups will be classified as PRIV
+        # This fixes the BHCE issue where marking someone as high-value auto-adds tier0 tags
+        return len(tier0_reasons) > 0, tier0_reasons</code></pre>
+
+            <p>This approach ensures that only users with <em>legitimate</em> Tier-0 privileges get classified as TIER-0 tasks, while users who are merely "high value" (but lack actual tier 0 group memberships) get properly classified as PRIV tasks. I know this is far from ideal and will certainly blow up in the future. But for now it works.</p>
+
+            <h2>## roadmap</h2>
+            <p>If caffeine intake and free time cooperate, there are of course still extensions planned. Here's what's coming next:</p>
+
+            <h3>### definitely on the list</h3>
+            <ul>
+                <li><strong>Abuse Info Integration:</strong> Add MITRE ATT&CK techniques and OPSEC notes to BloodHound nodes</li>
+                <li><strong>OpenGraph Optimization:</strong> Switch from name-based to ID-based node matching for reliable BloodHound integration</li>
+                <li><strong>Node Caching System:</strong> Multi-tier caching to reduce API calls by 80% and speed up repeated runs</li>
+                <li><strong>API Key Authentication:</strong> Support for BloodHound API tokens instead of username/password</li>
+                <li><strong>Enhanced SID Resolution:</strong> Improved fallback chain combining BloodHound, LDAP, and local SID databases</li>
+                <li><strong>Unreachable Hosts Tracking:</strong> Show failed connections in summary with detailed error reasons</li>
+            </ul>
+
+            <h3>### when i find time</h3>
+            <ul>
+                <li><strong>Asynchronous Processing:</strong> Multi-threaded target processing for 10x speedup on large environments</li>
+                <li><strong>LAPS Support:</strong> Automatic Local Administrator Password Solution integration like NetExec</li>
+                <li><strong>Custom Tier-0 Mappings:</strong> Support for user-defined TIER-0 targets beyond standard groups</li>
+            </ul>
+
+            <h3>### nice to have</h3>
+            <ul>
+                <li><strong>Colored Terminal Output:</strong> Rich formatting with progress bars and status indicators</li>
+                <li><strong>WMI Password Validation:</strong> Check if stored task passwords are still valid via WMI queries</li>
+                <li><strong>Automatic Script Grabbing:</strong> Download task executables for offline analysis with restore functionality</li>
+                <li><strong>Blue Team Audit Mode:</strong> HTML reports with remediation guidance, etc.</li>
+            </ul>
+
+            <h2>## acknowledgements</h2>
+            <p>TaskHound wouldn't exist without the incredible work done by the security research community. Special thanks to:</p>
+
+            <ul>
+                <li><strong><a href="https://github.com/fortra/impacket" target="_blank">Fortra/Impacket</a></strong> - For providing essentially the basis for 90% of nix* based tooling.</li>
+                <li><strong><a href="https://github.com/SpecterOps/BloodHound" target="_blank">SpecterOps/BloodHound</a></strong> - For revolutionizing Active Directory attack path analysis. Literally.</li>
+                <li><strong><a href="https://github.com/Podalirius/bh-opengraph" target="_blank">Podalirius/bh-opengraph</a></strong> - For the OpenGraph integration inspiration and implementation guidance that saved me so much headache.</li>
+                <li><strong><a href="https://github.com/tijldeneut/DPAPIck3" target="_blank">tijldeneut/DPAPIck3</a></strong> and <strong><a href="https://github.com/n1nj4sec/pupy" target="_blank">Pupy Project</a></strong> - For the DPAPI SYSTEM masterkey decryption techniques</li>
+                <li><strong><a href="https://github.com/gentilkiwi/mimikatz" target="_blank">gentilkiwi/mimikatz</a></strong> -  You know why.</li>
+                <li><strong><a href="https://twitter.com/toneillcodes" target="_blank">@toneillcodes</a></strong> - For the outstanding blog series about DPAPI.</li>
+            </ul>
+            <br>
+            <p>And every contributor to these projects for the amazing work they've done for the community. The open-source security research ecosystem is what makes tools like TaskHound possible.</p>
+
+            <h2>## outro</h2>
+            <p style="font-style: italic; text-align: center; margin: 2em 0;">Please insert creative outro here.</p>
+            <p style="font-style: italic; text-align: center;">It's 01:00 AM and my coffee is gone.</p>
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="taskhound/img/skeletor.jpeg" alt="Skeletor meme" style="max-width: 100%; height: auto; border-radius: 5px; margin-top: 1em;">
+            </p>
+        </article>
+    </main>
+
+    <footer></footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <script src="../js/quotes.js"></script>
+    <script src="../js/footer.js"></script>
+</body>
+</html>

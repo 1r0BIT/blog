@@ -1,0 +1,537 @@
+/* Import pixelated fonts */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+/* Import Prism.js theme - customized for Catppuccin */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css');
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #1e1e2e; /* Catppuccin Mocha Base */
+    color: #cdd6f4; /* Catppuccin Mocha Text */
+    font-family: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Menlo', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 20px;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: unset;
+    font-smooth: never;
+}
+
+/* Container */
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+/* ASCII Logo */
+.ascii-logo {
+    color: #a6e3a1; /* Catppuccin Mocha Green */
+    font-size: 12px;
+    line-height: 1.2;
+    margin: 0;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    text-align: center;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px;
+}
+
+.quote-display {
+    background: #1e1e2e;
+    color: #a6e3a1;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    text-align: center;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px;
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+header {
+    margin-bottom: 20px;
+}
+
+/* Navigation */
+nav {
+    text-align: center;
+    margin-bottom: 50px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+}
+
+nav p {
+    color: #6c7086; /* Catppuccin Mocha Overlay0 */
+}
+
+nav a {
+    color: #89b4fa; /* Catppuccin Mocha Blue */
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+nav a:hover {
+    color: #a6e3a1; /* Catppuccin Mocha Green */
+    text-decoration: underline;
+}
+
+/* Typography */
+h1 {
+    color: #cdd6f4; /* Catppuccin Mocha Text */
+    font-size: 28px;
+    font-weight: normal;
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+h2 {
+    color: #a6e3a1; /* Catppuccin Mocha Green */
+    font-size: 22px;
+    font-weight: bold;
+    margin: 40px 0 20px 0;
+}
+
+h3 {
+    color: #f9e2af; /* Catppuccin Mocha Yellow */
+    font-size: 18px;
+    font-weight: bold;
+    margin: 30px 0 15px 0;
+}
+
+h4 {
+    color: #89b4fa; /* Catppuccin Mocha Blue */
+    font-size: 16px;
+    font-weight: bold;
+    margin: 25px 0 12px 0;
+}
+
+p {
+    margin-bottom: 15px;
+    color: #bac2de; /* Catppuccin Mocha Subtext1 */
+}
+
+/* Links */
+a {
+    color: #89b4fa; /* Catppuccin Mocha Blue */
+    text-decoration: none;
+}
+
+a:hover {
+    color: #a6e3a1; /* Catppuccin Mocha Green */
+    text-decoration: underline;
+}
+
+/* Lists */
+ul.post-list {
+    list-style: none;
+    margin: 20px 0;
+}
+
+ul.post-list li {
+    margin: 12px 0;
+    padding-left: 10px;
+}
+
+.date {
+    color: #6c7086; /* Catppuccin Mocha Overlay0 */
+    margin-right: 10px;
+}
+
+/* Sections */
+section {
+    margin: 50px 0;
+}
+
+.prelude {
+    background-color: #181825; /* Catppuccin Mocha Mantle */
+    padding: 25px;
+    border-left: 3px solid #a6e3a1; /* Catppuccin Mocha Green */
+    margin: 30px 0;
+}
+
+/* Code blocks */
+pre {
+    background-color: #1e1e2e;
+    border: 1px solid #313244;
+    border-radius: 5px;
+    padding: 15px;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 500px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+pre[class*="language-"] {
+    background-color: #181825 !important;
+    margin: 20px 0;
+    padding: 15px !important;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 500px;
+}
+
+pre.scrollable {
+    max-height: 400px;
+    overflow-y: scroll;
+}
+
+pre.tall {
+    max-height: 600px;
+}
+
+pre.short {
+    max-height: 250px;
+}
+
+code {
+    background-color: #313244; /* Catppuccin Mocha Surface0 */
+    color: #a6e3a1; /* Catppuccin Mocha Green */
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', 'Consolas', monospace;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+pre code {
+    background-color: transparent !important;
+    padding: 0;
+    display: block;
+    color: #cdd6f4 !important;
+    white-space: pre;
+}
+
+/* Prism.js line numbers customization */
+pre.line-numbers {
+    position: relative;
+    padding-left: 3.8em;
+    counter-reset: linenumber;
+}
+
+pre.line-numbers > code {
+    position: relative;
+    white-space: inherit;
+}
+
+.line-numbers .line-numbers-rows {
+    position: absolute;
+    pointer-events: none;
+    top: 0;
+    font-size: 100%;
+    left: -3.8em;
+    width: 3em;
+    letter-spacing: -1px;
+    border-right: 1px solid #45475a;
+    user-select: none;
+    text-shadow: none !important;
+}
+
+.line-numbers-rows > span {
+    display: block;
+    counter-increment: linenumber;
+    text-shadow: none !important;
+}
+
+.line-numbers-rows > span:before {
+    content: counter(linenumber);
+    color: #6c7086;
+    display: block;
+    padding-right: 0.8em;
+    text-align: right;
+    text-shadow: none !important;
+}
+
+/* Custom Catppuccin syntax highlighting colors */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #6c7086 !important; /* Catppuccin Mocha Overlay0 */
+}
+
+.token.punctuation {
+    color: #bac2de !important; /* Catppuccin Mocha Subtext1 */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #fab387 !important; /* Catppuccin Mocha Peach */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #a6e3a1 !important; /* Catppuccin Mocha Green */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+    color: #89dceb !important; /* Catppuccin Mocha Sky */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+    color: #cba6f7 !important; /* Catppuccin Mocha Mauve */
+}
+
+.token.function,
+.token.class-name {
+    color: #89b4fa !important; /* Catppuccin Mocha Blue */
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+    color: #f9e2af !important; /* Catppuccin Mocha Yellow */
+}
+
+.token.important,
+.token.bold {
+    font-weight: bold;
+}
+
+.token.italic {
+    font-style: italic;
+}
+
+.token.entity {
+    cursor: help;
+}
+
+/* Blockquotes */
+blockquote {
+    border-left: 3px solid #f9e2af; /* Catppuccin Mocha Yellow */
+    padding-left: 20px;
+    margin: 20px 0;
+    color: #a6adc8; /* Catppuccin Mocha Subtext0 */
+    font-style: italic;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+table th,
+table td {
+    border: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+    padding: 10px;
+    text-align: left;
+}
+
+table th {
+    background-color: #313244; /* Catppuccin Mocha Surface0 */
+    color: #a6e3a1; /* Catppuccin Mocha Green */
+}
+
+/* Footer */
+footer {
+    margin-top: 80px;
+    text-align: center;
+    color: #585b70; /* Catppuccin Mocha Surface2 */
+    font-size: 12px;
+}
+
+footer p {
+    margin: 10px 0;
+}
+
+/* Images */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 20px auto;
+    border: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+}
+
+/* Horizontal rule */
+hr {
+    border: none;
+    border-top: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+    margin: 40px 0;
+}
+
+/* Selection */
+::selection {
+    background-color: #a6e3a1; /* Catppuccin Mocha Green */
+    color: #1e1e2e; /* Catppuccin Mocha Base */
+}
+
+::-moz-selection {
+    background-color: #a6e3a1; /* Catppuccin Mocha Green */
+    color: #1e1e2e; /* Catppuccin Mocha Base */
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e1e2e; /* Catppuccin Mocha Base */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #45475a; /* Catppuccin Mocha Surface1 */
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #585b70; /* Catppuccin Mocha Surface2 */
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        font-size: 13px;
+    }
+    
+    .container {
+        padding: 20px 10px;
+    }
+    
+    .ascii-logo {
+        font-size: 9px;
+    }
+    
+    h1 {
+        font-size: 18px;
+    }
+    
+    h2 {
+        font-size: 16px;
+    }
+}
+
+/* Clean Prism.js syntax highlighting - Catppuccin Mocha */
+.token { 
+    color: #cdd6f4 !important;
+    text-shadow: none !important;
+}
+
+/* Comments */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata { 
+    color: #6c7086 !important; 
+    text-shadow: none !important; 
+}
+
+/* Punctuation and operators - keep them neutral */
+.token.punctuation,
+.token.operator { 
+    color: #cdd6f4 !important; 
+    text-shadow: none !important; 
+}
+
+/* Strings and values */
+.token.string,
+.token.attr-value { 
+    color: #a6e3a1 !important; 
+    text-shadow: none !important; 
+}
+
+/* Keywords */
+.token.keyword,
+.token.builtin { 
+    color: #cba6f7 !important; 
+    text-shadow: none !important; 
+}
+
+/* Numbers and booleans */
+.token.number,
+.token.boolean { 
+    color: #fab387 !important; 
+    text-shadow: none !important; 
+}
+
+/* Functions and methods */
+.token.function,
+.token.class-name { 
+    color: #89b4fa !important; 
+    text-shadow: none !important; 
+}
+
+/* Properties and attributes */
+.token.property,
+.token.attr-name { 
+    color: #fab387 !important; 
+    text-shadow: none !important; 
+}
+
+/* Variables and identifiers */
+.token.variable { 
+    color: #cdd6f4 !important; 
+    text-shadow: none !important; 
+}
+
+/* Fix line numbers for code blocks */
+pre.line-numbers {
+    padding-left: 3.8em !important;
+}
+
+/* Remove shadows from all code block content */
+pre *, 
+pre code *, 
+code *,
+.language-plaintext,
+.language-plaintext * {
+    text-shadow: none !important;
+}
+
+/* Nuclear option: Force all code content to use consistent colors */
+pre[class*="language-"] *,
+code[class*="language-"] * {
+    color: #cdd6f4 !important;
+    text-shadow: none !important;
+}
+
+/* Override any specific Prism token colors */
+.token.assign,
+.token.regex,
+.token.important,
+.token.bold,
+.token.italic,
+.token.entity,
+.token.url,
+.token.selector,
+.token.atrule,
+.token.rule,
+.token.deleted,
+.token.inserted {
+    color: #cdd6f4 !important;
+    text-shadow: none !important;
+}
