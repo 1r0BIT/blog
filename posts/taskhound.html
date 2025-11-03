@@ -558,7 +558,7 @@
                 <img src="taskhound/img/but_wait_theres_more.jpeg" alt="But wait there's more meme" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
             <h2>## extras</h2>
-            <h3>### dpapi integration</h3>
+            <h3>### dpapi extraction</h3>
             <p>Another neat convenience feature is automatic DPAPI credential extraction. Shoutout to <a href="https://x.com/xct_de">xct</a> for the suggestion. When TaskHound finds tasks with stored passwords, it can automatically dump and decrypt the credential blobs (Given that you acquired the DPAPI SYSTEM key somehow without making the SOC light up like a christmas tree). Of course you can also just grab the blobs and store them for later decryption. I would have loved to integrate some sort of association between blobs and their respective tasks without having to decrypt them first. But this is left as an exercise for the reader.</p>
             
             <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/dpapi/looter.py#L108-L140" target="_blank" style="color: #89b4fa;">taskhound/dpapi/looter.py, lines 108-140</a></p>
