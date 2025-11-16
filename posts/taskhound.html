@@ -373,7 +373,7 @@
 
             <p>Here's how the nodes and edges get generated from the SchedTask data:</p>
             
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/feature/opengraph-integration/taskhound/output/opengraph.py#L273-L320" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 273-320</a></p>
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L273-L320" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 273-320</a></p>
 
             <pre class="line-numbers"><code class="language-python">def generate_opengraph_files(output_dir: str, tasks: List[Dict],
                             bh_api_url: Optional[str] = None,
@@ -696,7 +696,7 @@
             
             <p>The solution requires checking not just the BHCE attributes, but also verifying <em>actual</em> membership in legitimate Tier-0 groups. Here's the hacky logic from <code>check_tier0()</code>:</p>
 
-            <p><em>Source:</em> <a href="https://github.com/1r0BIT/TaskHound/blob/feature/opengraph-integration/taskhound/parsers/highvalue.py#L634-L745" target="_blank">taskhound/parsers/highvalue.py#L634-L745</a></p>
+            <p><em>Source:</em> <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/parsers/highvalue.py#L634-L745" target="_blank">taskhound/parsers/highvalue.py#L634-L745</a></p>
 
             <pre class="line-numbers"><code class="language-python">        # Check 1: Group membership verification (PRIMARY - most accurate)
         # This works for both Legacy and BHCE and provides ground truth
