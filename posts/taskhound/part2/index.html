@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mod it 'til it breaks: TaskHound 1.1.0 and the Art of Feature Creep</title>
+    <link rel="stylesheet" href="../../../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div id="quote-container"></div>
+        </header>
+
+        <nav>
+            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../whoami.html">whoami</a> ]</p>
+        </nav>
+
+        <main>
+        <article>
+            <h1>mod it 'til it breaks: taskhound 1.1.0 and the art of feature creep</h1>
+            <p class="meta">Posted on January 2nd 2026 | ~18 min read</p>
+
+            <div class="prelude">
+                <h3># TL;DR</h3>
+                <p>Around three months ago, I released TaskHound with the bold claim that it would make hunting for privileged scheduled tasks less painful. Plot twist: I was wrong. It was still painful. Just differently. So I did what any reasonable person would do: locked myself in a room with too much caffeine, gave Copilot my wallet (bad decision), and rebuilt it into “TaskHound, but (maybe) actually useful this time.” This post is about what went wrong, what changed, and how something as boring as "name/identity resolution" resulted in severe gravitational anomalies in my basement that caused my keyboard to "fall" against the wall (multiple times).</p>
+            </div>
+
+            <h2>## previously on taskhound...</h2>
+            <p>If you haven't read the <a href="../part1/index.html" style="color: #cba6f7;">original blog post</a>, here's the quick recap: TaskHound is a tool that hunts for Windows scheduled tasks running with privileged accounts and stored credentials. It connects via SMB, grabs task XMLs, parses them, and identifies high-value targets through BloodHound integration. The original version worked. Mostly. In lab environments. When the stars aligned.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/it_works_on_my_machine.jpg" alt="It works on my machine meme" style="max-width: 50%; height: auto; border-radius: 5px;">
+            </p>
+
+            <p>As soon as the tool touched a production environment (you know, one that wasn't lovingly handcrafted in my home lab) it immediately nosedived and refused to work. Edge cases kept piling up and it turned out that real environments have this annoying habit of being... well, real:</p>
+
+            <ul style="margin-left: 2em;">
+                <li><strong>Scale:</strong> Scanning 500+ hosts one by one? That's not a pentest, that's a meditation retreat.</li>
+                <li><strong>Authentication:</strong> Different credentials for different hosts? Rotating LAPS passwords? Hope you enjoy copy-pasting passwords while crying.</li>
+                <li><strong>Is this password even valid?:</strong> Finding a task with stored credentials is great. Having <code>pwdlastset</code> as the only indicator of it being valid? Less great. </li>
+                <li><strong>Resolving SIDs and names across domains?:</strong> Hah. That's a good one. More on that later.</li>
+            </ul>
+            <p></p>
+            <p>So I did what any maniac would do: I collected live data and feedback and then locked myself away for way too long, burned through my entire copilot budget to rewrite half the tool, added a dozen new features, and introduced so many CLI flags that the help output now requires scrolling. Seriously, if you can use TaskHound right now you can probably fly the goddamn starship enterprise. I'm aware of this and it's already on the roadmap.</p>
+
+            <h2>## the feature bonanza</h2>
+            <p>Let's dive into what's new. Grab a coffee. Or two. This is going to be a ride.</p>
+
+            <h3>### where it all started: identity resolution is awful</h3>
+            <p>Let's take a moment to admire Microsoft's commitment to chaos. They have a perfectly good globally unique identifier, the SID, and instead of using it everywhere, they just decided not to. Repeatedly. With confidence.</p>
+
+                        <p style="text-align: center; margin: 2em 0;">
+                <img src="img/specterops.png" alt="SpecterOps Slack Screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <p>In scheduled task XMLs alone, there are <strong>five</strong> <a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tsch/d1058a28-7e02-4948-8b8d-4a347fa64931" target="_blank" style="color: #89b4fa;">documented</a> ways to specify a UserId:</p>
+                
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">#</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Format</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">1</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">NetBIOS or FQDN domain\username</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>CORP\svc_backup</code></td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">2</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">User Principal Name (UPN)</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>user@domain.local</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">3</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Local account</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>.\localadmin</code></td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">4</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Built-in service account</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>LOCAL SYSTEM</code>, <code>NETWORK SERVICE</code>, <code>LOCAL SERVICE</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">5</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Raw SID string</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>S-1-5-21-...</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Want to guess which one is most common?</p>
+            <p>Hint: it is not the SID. Because of course it isn't. Because that would actually make sense.</p>
+
+            <p>This turns name and identity resolution into one of the most annoying parts of the original version of the tool. You find a task running as <code>EXDOM01\svc_inet</code> and have absolutely no idea if that is a privileged account or not. You cannot even be sure it is referencing an account in your own domain if the admins decided to get creative with the NETBIOS domain name.</p>
+
+            <p>If the task stored the SID, we could just map it directly to BloodHound and move on with our lives. But no. Instead we get <code>NETBIOS\samAccountName</code>, the identity equivalent of "some guy named Steve". Now you have to figure out what EXDOM01 even means, whether you have BloodHound data for it, whether it is your own domain, a trusted domain, or a domain that was decommissioned three centuries ago and someone just forgot to pull the plug. None of this existed in the original version. Yay.</p>
+
+            <p>The original code did exactly one LDAP query against the current domain and assumed reality would politely cooperate. Reality did not.</p>
+
+            <p>This became painfully obvious in production environments. Tasks running as local accounts still have SIDs, so you happily query BloodHound and LDAP for <code>S-1-5-21-...</code> only to realize it is a machine local account that does not exist in AD at all. Cross domain accounts like <code>CHILD\admin</code> require figuring out what domain CHILD even refers to. And cross forest trusts just add another layer of joy, because those SIDs might not exist in any domain you have data for.</p>
+
+            <p>Welcome to the hell I've been through for the past months. Take a seat.</p>
+
+            <p>This was the moment I started to understand why so many people before me had the same idea and then just went: "ah, csv files aren't that bad after all."</p>
+
+            <p>Because honestly, once you have been burned by this enough times, dumping scheduled tasks into a CSV and calling it a day starts to feel like the healthy life choice. No resolution. No correlation. Just a flat list of whatever string Microsoft decided to shove into the UserId field that day. You squint at it, maybe grep for "admin", nod thoughtfully, and move on. Many existing tools and PowerShell scripts stop exactly there, and after dealing with this mess, I get it. Deeply.</p>
+
+            <p>But at this point I had already mass-burned way too much time (and money) on this project to just give up. Sunk cost fallacy? Yes. Stubbornness? Also yes. So, I over-engineered my way out of the problem and built a multi-tier fallback chain. Because if one method fails, why not try four more?</p>
+
+            <pre><code>BloodHound (On first run) -> Cache -> LSARPC -> LDAP -> Global Catalog</code></pre>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Tier</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Source</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">1</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">BloodHound</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Fastest, no network traffic (if connected)</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">2</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">SQLite Cache</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Previously resolved SIDs (persistent across runs)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">3</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">LSARPC</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Direct target query (or DC query that follows the trust chain)</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">4</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">LDAP</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Domain controller query</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">5</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Global Catalog</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Cross-domain/forest SIDs</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>Each tier tries to resolve the name or the SID. If it fails, move to the next. If it succeeds, cache the result (more on that in a second) and move on. This handles pretty much every scenario I've encountered in the wild (watch me eat my words on that one).</p>
+
+            <p>Is it perfect? God no. My original vision was naive: one source of truth for identity correlation, clean mappings, done. Turns out that's impossible when each source gives you different pieces of the puzzle. BloodHound has the privilege relationships but doesn't store NetBIOS domain names (just the FQDN). LDAP has the full identity data but requires knowing which DC to query. Task Scheduler RPC gives you execution history for credential validation, but nothing else. The cache ties it all together (talking about this in a sec), but only after you've already done the legwork. There is no single source. Just a ton of duct tape holding multiple sources together. I've come to terms with that. And you should too. That's why the whole thing is currently being refactored in a separate branch because all of this "elegant multi-tier architecture" somehow became a single 2800+ line file of spaghetti code. Don't ask how. I don't know either.</p>
+
+            <p>Anyway. Enough complaining. Despite all of this, it works. And you can customize which sources to use based on your requirements:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># Full resolution (default)
+taskhound -u homer -p 'Doh!123' -d corp.local -t target
+
+# No LDAP (BloodHound → Cache → LSARPC only)
+# From the Box. LSARPC might instruct the Target to query the DC
+taskhound --no-ldap ...
+
+# No RPC (BloodHound → Cache → LDAP → GC only)
+taskhound --no-rpc ...
+
+# OPSEC mode (BloodHound → Cache only)
+taskhound --opsec ...
+
+# Custom Global Catalog server for cross-forest resolution
+taskhound --gc-server 10.0.0.1 ...</code></pre>
+
+            <h3>### sqlite caching: the obvious solution i didn't think of initially</h3>
+            <p>Here's the thing about multi-tier SID resolution: it works great. If you only plan to run the tool once in a lifetime. But when you're scanning 500+ hosts and each host has 10 tasks, and each task references an account, you're suddenly making countless resolution attempts. Many of them for the <em>same SIDs or names</em>.</p>
+
+            <p>Without caching, runs against a medium-sized environment were taking 45+ minutes and generating enough LDAP traffic to make the DC sad.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/this_is_fine.jpg" alt="Everything is fine meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <p>So TaskHound now maintains a cache. A dynamic in-memory cache and a persistent SQLite cache. </p>
+
+            <pre><code>+---------------------------------------------------------------------------------+
+|                           CACHE ARCHITECTURE                                    |
++---------------------------------------------------------------------------------+
+|                                                                                 |
+|  +-------------------+      +-----------------------------------------------+   |
+|  |  Worker Thread    |      |              CacheManager                     |   |
+|  |  (scan target)    |      |  +----------------------------------------+   |   |
+|  +---------+---------+      |  |      Session Cache (in-memory dict)    |   |   |
+|            |                |  |  +----------------------------------+  |   |   |
+|            | cache.get()    |  |  | {"sids:S-1-5-..": "CORP\\admin"} |  |   |   |
+|            |                |  |  | {"computers:DC01": {...}}        |  |   |   |
+|            v                |  |  +----------------------------------+  |   |   |
+|  +-------------------+      |  |           ^         |                  |   |   |
+|  |  1. Check         |&lt;-----+  |    RLock  |    miss |                  |   |   |
+|  |  Session Cache    |      |  |  (thread- |         v                  |   |   |
+|  |  (fastest)        |      |  |   safe)   |   +----------+             |   |   |
+|  +---------+---------+      |  |           |   | promote  |             |   |   |
+|            | miss           |  |           |   | on hit   |             |   |   |
+|            v                |  +-----------+---+----------+-------------+   |   |
+|  +-------------------+      |              |              |                 |   |
+|  |  2. Check         |      |  +-----------+--------------+--------------+  |   |
+|  |  Persistent       |&lt;-----+  |       SQLite (~/.taskhound/cache.db)    |  |   |
+|  |  Cache (SQLite)   |      |  |  +--------------------------------------+  |   |
+|  +---------+---------+      |  |  | TABLE cache                          |  |   |
+|            | miss           |  |  | +-- category  TEXT  (sids/computers) |  |   |
+|            v                |  |  | +-- key       TEXT  (S-1-5-.../DC01) |  |   |
+|  +-------------------+      |  |  | +-- value     JSON  (resolved data)  |  |   |
+|  |  3. Live Query    |      |  |  | +-- expires_at INT  (unix timestamp) |  |   |
+|  |  (LDAP/RPC/BH)    |------+  |  +--------------------------------------+  |   |
+|  +-------------------+      |  |         |                                  |   |
+|            |                |  |         | WAL mode + per-thread connections|   |
+|            | result         |  |         | (threading.local)                |   |
+|            v                |  |         v                                  |   |
+|  +-------------------+      |  |  +--------------------------------------+  |   |
+|  |  cache.set()      |------+  |  |  Thread 1: conn1 --+                 |  |   |
+|  |  (both tiers)     |      |  |  |  Thread 2: conn2 --+--> Same DB file |  |   |
+|  +-------------------+      |  |  |  Thread N: connN --+    (no locks)   |  |   |
+|                             |  |  +--------------------------------------+  |   |
+|                             |  +--------------------------------------------+   |
++---------------------------------------------------------------------------------+</code></pre>
+
+<p></p>            
+<p>The cache lives in <code>~/.taskhound/cache.db</code> with a default TTL of 24 hours. This means:</p>
+
+            <ul style="margin-left: 2em;">
+                <li>SID resolutions are cached across runs</li>
+                <li>LAPS credentials are cached (until they rotate)</li>
+                <li>Subsequent scans of the same environment are <em>significantly</em> faster</li>
+            </ul>
+            <p></p>
+            <p>The cache architecture is flat at the moment, meaning there is only one table in the DB called "cache". I know that's not optimal but so far it works well enough for what it's intended to do.</p>
+            <p>You can control the cache with the following flags:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># Clear the cache before a fresh run
+taskhound --clear-cache ...
+
+# Disable caching entirely
+taskhound --no-cache ...
+
+# Custom TTL (in seconds)
+taskhound --cache-ttl 3600 ...</code></pre>
+
+            <h3>### caching made this possible: multi-threaded scanning</h3>
+            <p>Here's the fun part: once you have proper caching, you can actually parallelize the scanning. Before caching, multi-threading would just mean <em>multiple threads hammering the DC simultaneously for the same result</em>. Not great.</p>
+
+            <p>TaskHound now supports parallel scanning with configurable thread counts and rate limiting:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># 20 parallel workers, max 5 targets per second
+taskhound -u homer -p 'Doh!123' -d corp.local --auto-targets --threads 20 --rate-limit 5
+
+# Go ham (not recommended for production)
+taskhound -u homer -p 'Doh!123' -d corp.local --targets-file hosts.txt --threads 50</code></pre>
+
+            <p>The implementation uses Python's <code>ThreadPoolExecutor</code> with per-target error isolation, so one failing host doesn't take down the entire scan. Each thread gets its own SMB connection and processes targets independently.</p>
+
+            <p>The SQLite cache uses WAL (Write-Ahead Logging) mode and per-thread connections via <code>threading.local()</code>, so concurrent access doesn't cause database locks or corruption. This took a few iterations to get right. Don't ask about the debugging sessions.</p>
+
+            <p>What about race conditions with multiple threads writing to the same cache key? Not a problem here. The cache stores deterministic mappings: hostname -> SID, SID -> name, etc. If two threads resolve the same SID simultaneously, they'll write the same value. The data is inherently consistent because these relationships are fixed in Active Directory. If they're <em>NOT</em> consistent? Congrats, you've found a broken domain. IPs are the one exception (they can change), but we have a pragmatic solution for that. We just won't cache those. Oh and there might be the edge case where an admin renames a computer while the scan is running and two distinct threads catch that host just at the right time. Yeah, I'm not going to implement that. If this should happen to you: I owe you a beer.</p>
+
+            <h3>### auto-target discovery</h3>
+            <p>Here's how target discovery used to work:</p>
+
+            <ol style="margin-left: 2em;">
+                <li>Query LDAP (or BloodHound) for all computer objects</li>
+                <li>Export to CSV</li>
+                <li>Manually filter out disabled accounts, stale computers, DCs</li>
+                <li>Create a text file with hostnames</li>
+                <li>Hope you didn't miss anything</li>
+            </ol>
+            <p></p>
+            <p>Now it's just:</p>
+
+            <pre class="line-numbers"><code class="language-bash">taskhound -u homer -p 'Doh!123' -d corp.local --dc-ip 10.0.0.1 --auto-targets</code></pre>
+
+            <p>TaskHound will:</p>
+            <ul style="margin-left: 2em;">
+                <li>Query BloodHound (if configured) or fall back to LDAP</li>
+                <li>Filter out disabled computer accounts</li>
+                <li>Filter out stale computers (inactive >60 days by default)</li>
+                <li>Exclude Domain Controllers (usually not what you want)</li>
+                <li>Return a nice, clean list of targets</li>
+            </ul>
+            <p></p>
+            <p>You can customize the filtering:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># Only servers
+taskhound --auto-targets --ldap-filter servers
+
+# Only workstations
+taskhound --auto-targets --ldap-filter workstations
+
+# Include DCs 
+taskhound --auto-targets --include-dcs
+
+# Include disabled computers (for some reason)
+taskhound --auto-targets --include-disabled
+
+# Custom stale threshold (90 days) or disable (0)
+taskhound --auto-targets --stale-threshold 90</code></pre>
+
+            <p>The data source priority is: BloodHound (if connected) -> LDAP fallback. BloodHound is preferred because it already has enriched data about computer objects, which saves additional LDAP queries.</p>
+
+            <h3>### typing passwords is for peasants: laps integration</h3>
+            <p>Remember the good old days when you had to manually retrieve LAPS passwords for each host, copy them into your command, and pray you didn't mess up? Yeah, neither do I. I've blocked out those memories.</p>
+
+            <p>Here's the thing though: in my recent engagements, compromising a LAPS Reader account has become <em>more common</em> than finding 50 hosts sharing the same local admin password. Security is actually improving!</p>
+
+            <p>Therefore, TaskHound now supports automatic LAPS credential retrieval for per-host authentication. It handles:</p>
+
+            <ul style="margin-left: 2em;">
+                <li><strong>Windows LAPS</strong> (Both <code>msLAPS-Password</code> and <code>msLAPS-EncryptedPassword</code>) </li>
+                <li><strong>Legacy LAPS</strong> (<code>ms-Mcs-AdmPwd</code>)</li>
+            </ul>
+            <p></p>
+            <p>The workflow is really simple:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># Old way (suffering)
+taskhound -u localadmin -p 'RetrievedPassword123!' -d . -t host1.corp.local
+# Repeat 500 times with different passwords
+
+# New way (enlightenment)
+taskhound -u domain_user -p 'DomainPass!' -d corp.local --targets-file hosts.txt --laps --threads 10</code></pre>
+
+            <p>Under the hood, TaskHound performs a two-phase connection for each target:</p>
+
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/laps/query.py#L65-L180" target="_blank" style="color: #89b4fa;">taskhound/laps/query.py, lines 65-180</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def query_laps_passwords(dc_ip, domain, username, password, ...) -> LAPSCache:
+    """Query all LAPS passwords from Active Directory."""
+    cache = LAPSCache(domain=domain)
+
+    # Connect to DC via LDAP
+    ldap_conn = get_ldap_connection(dc_ip, domain, username, password, ...)
+
+    # Build base DN from domain
+    base_dn = ",".join([f"DC={part}" for part in domain.split(".")])
+
+    # Query computers with any LAPS attribute
+    ldap_filter = """(&amp;(objectClass=computer)
+        (|(ms-Mcs-AdmPwd=*)
+          (msLAPS-Password=*)
+          (msLAPS-EncryptedPassword=*)))"""  
+
+    attributes = [
+        "sAMAccountName",              # Computer name (WS01$)
+        "dNSHostName",                 # FQDN
+        "ms-Mcs-AdmPwd",               # Legacy LAPS (plaintext)
+        "msLAPS-Password",             # Windows LAPS (JSON)
+        "msLAPS-EncryptedPassword",    # Windows LAPS (DPAPI-NG encrypted)
+        "msLAPS-PasswordExpirationTime",
+    ]
+
+    # Create decryption context for encrypted passwords (dpapi-ng)
+    decrypt_ctx = LAPSDecryptionContext.from_credentials(
+        domain=domain, username=username, password=password, ...
+    )
+
+    # Search and process results
+    for entry in ldap_conn.search(base_dn, ldap_filter, attributes):
+        cred = _parse_ldap_entry(entry, decrypt_ctx)  # Handles all 3 formats
+        if cred:
+            cache.add(cred)
+
+    # Save to persistent cache for future runs
+    cache.save_to_persistent_cache()
+    return cache</code></pre>
+
+            <p>The best part? It also leverages the same SQLite cache, so subsequent runs don't hammer your DC with LDAP queries. Your blue team will thank you. Or at least be slightly less annoyed.</p>
+
+            <h3>### trust but verify: credential validation</h3>
+            <p>Here's the problem with stored credentials: they might be stale. The old code had exactly one reliable check: if <code>pwdLastChanged</code> from the account running the task was <em>older</em> than the task creation date. Considering how most mature environments handle credential rotation? Unlikely. Passwords rotate, tasks don't get updated, and you're left guessing.</p>
+
+            <p>My initial idea was to query WMI for the task's last return code. Workable. But clunky and noisy as hell. Then Claude Opus suggested something I hadn't even considered: just check the Task Scheduler's own execution history. Windows already tracks whether credentials worked. We just need to ask.</p>
+
+            <p>TaskHound now queries the Task Scheduler RPC service to check if stored credentials are actually valid based on task execution history and return codes.</p>
+
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/task_rpc.py#L170-L260" target="_blank" style="color: #89b4fa;">taskhound/smb/task_rpc.py, lines 170-260</a></p>
+
+            <pre class="line-numbers"><code class="language-python">class TaskSchedulerRPC:
+    """Task Scheduler RPC client using MS-TSCH protocol over \\pipe\\atsvc."""
+
+    def connect(self) -> bool:
+        """Establish RPC connection to Task Scheduler service."""
+        # Bind to Task Scheduler named pipe
+        binding = f"ncacn_np:{self.target}[\\pipe\\atsvc]"
+        rpc_transport = transport.DCERPCTransportFactory(binding)
+        rpc_transport.set_credentials(
+            self.username, self.password, self.domain,
+            self.lm_hash, self.nt_hash, self.aes_key,
+        )
+
+        # Enable Kerberos if using AES key or explicit flag
+        if self.kerberos or self.aes_key:
+            rpc_transport.set_kerberos(True, kdcHost=self.dc_ip)
+
+        self._dce = rpc_transport.get_dce_rpc()
+        # PKT_PRIVACY is REQUIRED - lower auth levels get access denied
+        self._dce.set_auth_level(RPC_C_AUTHN_LEVEL_PKT_PRIVACY)
+        if self.kerberos:
+            self._dce.set_auth_type(RPC_C_AUTHN_GSS_NEGOTIATE)
+
+        self._dce.connect()
+        self._dce.bind(tsch.MSRPC_UUID_TSCHS)  # MS-TSCH interface
+        return True
+
+    def get_task_last_run_info(self, task_path: str) -> TaskRunInfo:
+        """Query task execution history via SchRpcGetLastRunInfo."""
+        result = tsch.hSchRpcGetLastRunInfo(self._dce, task_path)
+        return_code = result["pLastRuntime"]["dwHighDateTime"]
+        # Map return code to credential status (valid/invalid/blocked/unknown)
+        return self._analyze_return_code(task_path, return_code)</code></pre>
+
+            <p>The logic here is a bit sneaky: Windows validates the password <em>before</em> checking if the account has batch logon rights. So even if a task fails with "Logon type not granted" for example, we know the password is correct. The credentials are valid for other authentication scenarios, just not batch jobs.</p>
+
+            <p>The output now includes validation status:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Status</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Meaning</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">DPAPI Worth It?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>VALID</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Credentials confirmed working, task can execute</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Absolutely</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>VALID (restricted)</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Password correct but account restricted</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Yes (just can't hijack the task)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>INVALID</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Logon failure (wrong password)</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Don't bother</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>BLOCKED</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Account disabled/locked/expired</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Account's dead anyway</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>UNKNOWN</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Task never ran, cannot determine</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Maybe?</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="background-color: #313244; border-left: 4px solid #f9e2af; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
+                <p style="margin: 0; color: #f9e2af; font-weight: bold;">OPSEC Warning</p>
+                <p style="margin: 0.5em 0 0 0;">Credential validation requires connecting to the Task Scheduler RPC service (<code>\pipe\atsvc</code>). This is <em>not</em> stealthy. If you're on a red team engagement where SOC alerts matter, use <code>--no-validate-creds</code> or <code>--opsec</code>.</p>
+            </div>
+
+            <h3>### credential guard detection:</h3>
+            <p>You know what's worse than finding a scheduled task with stored credentials? Spending an hour on DPAPI extraction only to discover Credential Guard is enabled and your masterkeys are useless.</p>
+
+            <p>TaskHound now checks for Credential Guard before you waste your time. It queries the remote registry for LSA protection settings (This was already implemented before but clearly experimental. It should work now. Emphasis on SHOULD)</p>
+
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/credguard.py#L147-L211" target="_blank" style="color: #89b4fa;">taskhound/smb/credguard.py, lines 147-211</a></p>
+
+            <pre class="line-numbers"><code class="language-python">def check_credential_guard(smb_conn, host) -> Optional[bool]:
+    """
+    Check if Credential Guard is enabled on a remote Windows host.
+    Automatically starts RemoteRegistry if stopped, restores afterward.
+    Returns: True (detected), False (not detected), None (check failed)
+    """
+    remote_ops = RemoteRegistryOps(smb_conn, host)
+    try:
+        remote_ops.enable_registry()
+        dce = remote_ops.get_rrp()
+
+        # Open HKLM\SYSTEM\CurrentControlSet\Control\Lsa
+        reg_handle = rrp.hOpenLocalMachine(dce)["phKey"]
+        lsa_path = "SYSTEM\\CurrentControlSet\\Control\\Lsa"
+        ans = rrp.hBaseRegOpenKey(dce, reg_handle, lsa_path, samDesired=rrp.KEY_READ)
+        lsa_handle = ans["phkResult"]
+
+        # Check LsaCfgFlags == 1
+        try:
+            val = rrp.hBaseRegQueryValue(dce, lsa_handle, "LsaCfgFlags")
+            if int.from_bytes(val["lpData"], "little") == 1:
+                return True
+        except DCERPCException:
+            pass
+
+        # Check IsolatedUserMode == 1
+        try:
+            val = rrp.hBaseRegQueryValue(dce, lsa_handle, "IsolatedUserMode")
+            if int.from_bytes(val["lpData"], "little") == 1:
+                return True
+        except DCERPCException:
+            pass
+
+        return False  # Neither flag set
+    except Exception:
+        return None  # Unable to check
+    finally:
+        remote_ops.finish()  # Restore service state</code></pre>
+
+            <div style="background-color: #313244; border-left: 4px solid #f38ba8; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
+                <p style="margin: 0; color: #f38ba8; font-weight: bold;">EXTREME OPSEC WARNING</p>
+                <p style="margin: 0.5em 0 0 0;">Credential Guard detection requires starting the Remote Registry service if it's stopped (which it usually is on modern Windows). This is <strong>HIGHLY detectable</strong>. Any decent SOC will see this. Use <code>--no-credguard</code> if you care about stealth. You've been warned.</p>
+            </div>
+
+            <h3>### offline disk analysis</h3>
+            <p>Sometimes all you need is a .vhdx seemingly abandoned in an SMB share. TaskHound now supports mounted disk image analysis. You still have to do the mounting yourself but at least you don't have to copy 2TB worth of thick provisioned disks around.</p>
+
+            <pre class="line-numbers"><code class="language-bash"># Analyze a mounted Windows disk image
+taskhound --offline-disk /mnt/evidence
+
+# Override hostname detection
+taskhound --offline-disk /mnt/disk --disk-hostname COMPROMISED-PC</code></pre>
+
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/engine/disk_loader.py#L315-L370" target="_blank" style="color: #89b4fa;">taskhound/engine/disk_loader.py, lines 315-370</a></p>
+
+            <pre class="line-numbers"><code class="language-python"># Windows paths relative to system root
+TASKS_PATH = "Windows/System32/Tasks"
+DPAPI_SYSTEM_PATH = "Windows/System32/Microsoft/Protect/S-1-5-18/User"
+SYSTEM_CREDS_PATH = "Windows/System32/config/systemprofile/AppData/Local/Microsoft/Credentials"
+GUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-...-[0-9a-f]{12}$", re.I)
+
+def extract_masterkeys(windows_root: Path, output_dir: Path) -> int:
+    """Extract SYSTEM DPAPI master keys for decrypting task credentials."""
+    dpapi_source = windows_root / DPAPI_SYSTEM_PATH
+    masterkeys_dest = output_dir / "masterkeys"
+    masterkeys_dest.mkdir(parents=True, exist_ok=True)
+
+    if not dpapi_source.exists():
+        # Fallback: check parent S-1-5-18 directory
+        alt_path = windows_root / "Windows/System32/Microsoft/Protect/S-1-5-18"
+        if alt_path.exists():
+            dpapi_source = alt_path
+
+    count = 0
+    for item in dpapi_source.iterdir():
+        # Only extract GUID-named files (actual masterkey blobs)
+        if item.is_file() and GUID_PATTERN.match(item.name):
+            shutil.copy2(item, masterkeys_dest / item.name)
+            count += 1
+        elif item.name.lower() == "preferred":
+            # Also copy Preferred file (points to current masterkey)
+            shutil.copy2(item, masterkeys_dest / item.name)
+    return count</code></pre>
+
+            <p>It will automatically:</p>
+            <ul style="margin-left: 2em;">
+                <li>Find the Windows root directory (handles various mount structures)</li>
+                <li>Extract the hostname from the SYSTEM registry hive</li>
+                <li>Collect scheduled task XMLs</li>
+                <li>Grab DPAPI masterkeys and credential blobs</li>
+                <li>Extract the DPAPI_SYSTEM key from registry (if possible)</li>
+            </ul>
+            <p></p>
+            <p>Yes, it also works with read-only mounts. TaskHound copies the necessary registry hives to a temp directory for parsing.</p>
+
+            <h3>### making it (somewhat) pretty: html reports</h3>
+            <p>Let's be honest: OpenGraph is great and CSV/JSON are nice for further processing but showing C-Level execs a terminal output with ANSI colors or an OpenGraph Screenshot don't exactly scream "professional audit report." TaskHound now generates HTML security reports with severity scoring:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># Generate HTML report
+taskhound -u homer -p 'Doh!123' -d corp.local --auto-targets -o html
+
+# Multiple formats
+taskhound -u homer -p 'Doh!123' -d corp.local --auto-targets -o plain,json,html</code></pre>
+
+            <p>The severity matrix is based on account type, stored credentials, and validation status:</p>
+
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/html_report.py#L49-L95" target="_blank" style="color: #89b4fa;">taskhound/output/html_report.py, lines 49-95</a></p>
+
+            <pre class="line-numbers"><code class="language-python">"""
+Severity Matrix:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Account Type │ Stored Creds │ Credential Status      │ Severity            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ TIER-0       │ Yes          │ Valid                  │ CRITICAL            │
+│ TIER-0       │ Yes          │ Outdated/Unconfirmed   │ HIGH                │
+│ TIER-0       │ Yes          │ Credential Guard       │ HIGH                │
+│ TIER-0       │ No           │ -                      │ MEDIUM              │
+│ PRIV         │ Yes          │ Valid                  │ HIGH                │
+│ PRIV         │ Yes          │ Outdated/Unconfirmed   │ MEDIUM              │
+│ PRIV         │ No           │ -                      │ LOW                 │
+│ TASK         │ Yes          │ Any                    │ LOW                 │
+│ TASK         │ No           │ -                      │ INFO                │
+└─────────────────────────────────────────────────────────────────────────────┘
+"""</code></pre>
+
+            <p>The HTML report includes filtering, severity badges, and is suitable for management reports and audit documentation. It's not going to win any design awards, but it's functional and doesn't require explaining what <code>[TIER-0]</code> means in a terminal.</p>
+
+            <p>Here's what the detail section looks like. There's a bunch of other things but I'd suggest you generate one yourself as this would definitely be too long to include here.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/html_report.png" alt="TaskHound HTML Report" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <h3>### keeping it minimal: opsec mode</h3>
+            <p>Red team engagements have different requirements than security audits. I don't need to tell you that. Sometimes you can't afford to light up the SOC like a Christmas tree.</p>
+
+            <p>TaskHound's default behavior is intentionally <strong>noisy</strong>. All features enabled for maximum visibility. But with <code>--opsec</code>, you get a "stealth" mode:</p>
+
+            <pre class="line-numbers"><code class="language-bash"># OPSEC mode enables all stealth flags at once
+taskhound -u homer -p 'Doh!123' -d corp.local -t target --opsec
+
+# Equivalent to:
+taskhound --no-ldap --no-rpc --no-loot --no-credguard --no-validate-creds</code></pre>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
+                <thead>
+                    <tr style="background-color: #313244;">
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Protocol</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Operations</th>
+                        <th style="padding: 0.75em; text-align: left; border: 1px solid #45475a;">Flag to Disable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">SMB</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Task enumeration (always used)</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">N/A - Required</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">LDAP(S)/GC</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">SID resolution, Tier-0 detection, pwdLastSet</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>--no-ldap</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">LSARPC</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Fallback SID resolution</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>--no-rpc</code></td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Remote Registry</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Credential Guard detection</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>--no-credguard</code></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Task Scheduler RPC</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Credential validation</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>--no-validate-creds</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p>The SID resolution chain also adapts to OPSEC mode.</p>
+
+            <p>Pro tip: Pre-populate BloodHound with domain data before your engagement. Then use <code>--opsec</code> with <code>--bh-live</code>. You get high-value target detection and SID resolution without generating any additional network traffic beyond the SMB connection (Given your BloodHound Instance runs locally).</p>
+
+            <h3>### flags are getting out of hand: configuration files</h3>
+            <p>I'll be the first to admit: the CLI has grown extensive. At some point, typing <code>taskhound --bh-live --bhce --bh-connector http://127.0.0.1:8080 --bh-api-key ... --bh-api-key-id ... --laps --threads 10 --rate-limit 5 ...</code> becomes an exercise in resilience.</p>
+
+            <p>That's why TaskHound now supports TOML configuration files:</p>
+
+            <pre class="line-numbers"><code class="language-toml"># ~/.config/taskhound/taskhound.toml or ./taskhound.toml
+
+[authentication]
+username = "svc_taskhound"
+domain = "CORP.LOCAL"
+
+[target]
+dc_ip = "10.0.0.1"
+threads = 10
+timeout = 30
+
+[bloodhound]
+live = true
+connector = "http://127.0.0.1:8080"
+api_key = "${BH_API_KEY}"      # Environment variable expansion!
+api_key_id = "${BH_API_KEY_ID}"
+type = "bhce"
+
+[bloodhound.opengraph]
+enabled = true
+output_dir = "./opengraph"
+
+[laps]
+enabled = true
+
+[cache]
+enabled = true
+ttl = 86400  # 24 hours</code></pre>
+
+            <p>Priority order: CLI args > Environment variables > Local config (./taskhound.toml) > User config (~/.config/taskhound/taskhound.toml) > Defaults</p>
+
+            <p>Now you can just run:</p>
+
+            <pre class="line-numbers"><code class="language-bash">taskhound --auto-targets</code></pre>
+
+            <p>And everything else comes from the config file. Much better. But there's still headroom. I'll get to that later.</p>
+
+            <h3>### pretty panels everywhere!</h3>
+            <p>The output has been completely redesigned using Rich for colored tables, progress indicators, and nicely formatted panels. Here's what a typical run looks like now (roughly):</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/output_demo.png" alt="TaskHound output demo" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <p>The output now shows:</p>
+            <ul style="margin-left: 2em;">
+                <li>Progress bar with ETA for multi-target scans</li>
+                <li>Credential validation status</li>
+                <li>Credential Guard detection results</li>
+                <li>LAPS usage statistics</li>
+                <li>Scan statistics with failure breakdown</li>
+                <li>Summary table per host</li>
+            </ul>
+
+            <h2>## what's still broken (i still blame copilot)</h2>
+            <p>I'd love to tell you TaskHound is perfect now. But that would be a lie. So here's what's up next:</p>
+
+            <h3>### the behemoth cli</h3>
+            <p>The number of CLI flags has grown to the point where the help output requires dedicated reading time. I'm aware. A refactor into modular stages with sensible presets is on the roadmap. For now, use config files to preserve your sanity.</p>
+
+            <h3>### gMSA accounts</h3>
+            <p>Group Managed Service Accounts (gMSA) detection has improved with samaccountname-based queries, but there are still edge cases where gMSA tasks aren't properly identified. If you're dealing with a lot of gMSA-based scheduled tasks, expect some manual verification.</p>
+
+            <h2>## What's next?</h2>
+            <p>The following items are actively being worked on (when caffeine permits):</p>
+
+            <h3>### definitely happening</h3>
+            <ul style="margin-left: 2em;">
+                <li><strong>Stage Modularization:</strong> Break the CLI into logical stages (warmup, collect, enrich, etc.) with sensible defaults</li>
+                <li><strong>Abuse Info Integration:</strong> Add MITRE ATT&CK techniques to BloodHound nodes</li>
+                <li><strong>Custom Tier-0 Mappings:</strong> Support for user-defined privilege zones in BHCE</li>
+            </ul>
+
+            <h3>### might happen if I find time</h3>
+            <ul style="margin-left: 2em;">
+                <li><strong>Integration with Other C2s:</strong> Beyond AdaptixC2/CobaltStrike</li>
+                <li><strong>*NIX Mode:</strong> Because Windows isn't the only OS storing tasks.</li>
+
+            </ul>
+
+            <h2>## the thankyou section:</h2>
+            <p>This update wouldn't have been possible without:</p>
+
+            <ul style="margin-left: 2em;">
+                <li>Everyone who provided feedback on Discord or GitHub</li>
+                <li>The folks who sent DMs with feature requests</li>
+                <li><strong><a href="https://github.com/Pennyw0rth/NetExec" target="_blank" style="color: #cba6f7;">NetExec</a></strong> for LAPS implementation inspiration</li>
+                <li><strong><a href="https://github.com/jborean93/dpapi-ng" target="_blank" style="color: #cba6f7;">dpapi-ng</a></strong> for making encrypted LAPS decryption possible</li>
+                <li>The absolute beasts from <strong><a href="https://specterops.io" target="_blank" style="color: #cba6f7;">SpecterOps</a></strong>! Not only for OpenGraph itself, but for the constant and instant support in the BloodHound Gang Slack</li>
+                <li>Caffeine. Lots of caffeine.</li>
+            </ul>
+
+            <h2>## outro</h2>
+            <p>Still no fancy outro. Sorry guys. I'm still figuring out a catchphrase.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/skeletor.jpeg" alt="Skeletor meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+        </article>
+    </main>
+
+    <footer></footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-toml.min.js"></script>
+    <script src="../../../js/quotes.js"></script>
+    <script src="../../../js/footer.js"></script>
+</body>
+</html>

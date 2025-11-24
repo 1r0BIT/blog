@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tool Spotlight: TaskHound - r0bit's blog</title>
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../../../css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
 </head>
 <body>
@@ -14,13 +14,18 @@
         </header>
 
         <nav>
-            <p>[ <a href="../index.html">home</a> | <a href="../posts.html">posts</a> | <a href="../toolshed.html">toolshed</a> | <a href="../whoami.html">whoami</a> ]</p>
+            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../whoami.html">whoami</a> ]</p>
         </nav>
 
         <main>
         <article>
             <h1>tool spotlight: taskhound</h1>
             <p class="meta">Posted on November 3 2025 | ~20 min read</p>
+
+            <div style="background-color: #313244; border-left: 4px solid #f9e2af; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
+                <p style="margin: 0; color: #f9e2af; font-weight: bold;">⚠️ Heads up: Parts of this post are outdated!</p>
+                <p style="margin: 0.5em 0 0 0;">TaskHound has received a major update since this was written. Some features, CLI flags, and behaviors described here have changed. For the latest and greatest, check out <a href="../part2/index.html" style="color: #89b4fa;">Part 2: mod it till it breaks</a>.</p>
+            </div>
 
             <div class="prelude">
                 <h3># TL;DR</h3>
@@ -39,7 +44,7 @@
             <p>From a purely offensive perspective, it doesn't get any better. Imagine this scenario: You've already compromised about 20 machines and are looking for ways to use them for a complete domain takeover. To avoid having to read dozens of scheduled task XMLs, you just blindly throw a DPAPI dump at everything you've compromised so far and hope for the best.</p>
 
             <p style="text-align: center; margin: 2em 0;">
-                <img src="taskhound/img/random_bullshit_go.jpeg" alt="Random Bullshit Go meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/random_bullshit_go.jpeg" alt="Random Bullshit Go meme" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
             
             <p>Even in the rare case that this works, there are still more questions left unanswered:</p>
@@ -105,7 +110,7 @@
 &lt;/Task&gt;</code></pre>
 
             <p style="text-align: center; margin: 2em 0;">
-                <img src="taskhound/img/life_choices.jpg" alt="Questioning life choices meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/life_choices.jpg" alt="Questioning life choices meme" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
 
             <h2>## introducing: taskhound</h2>
@@ -536,26 +541,26 @@
 
             <p> This will (hopefully) result in something like this:</p>
                         <p style="text-align: center; margin: 1.5em 0;">
-                <img src="taskhound/img/opengraph_bloodhound.jpeg" alt="TaskHound BloodHound integration screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/opengraph_bloodhound.jpeg" alt="TaskHound BloodHound integration screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
 
             <h2>## in action</h2>
             <p>Here's what it looks like when you run it:</p>
 
             <p style="text-align: center; margin: 1.5em 0;">
-                <img src="taskhound/img/taskhound_init.png" alt="TaskHound initialization screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/taskhound_init.png" alt="TaskHound initialization screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
             
             <p style="text-align: center; margin: 1.5em 0;">
-                <img src="taskhound/img/opengraph_collect.png" alt="TaskHound collecting data screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/opengraph_collect.png" alt="TaskHound collecting data screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
             
             <p style="text-align: center; margin: 1.5em 0;">
-                <img src="taskhound/img/taskhound_summary.png" alt="TaskHound summary screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/taskhound_summary.png" alt="TaskHound summary screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
 
                         <p style="text-align: center; margin: 2em 0;">
-                <img src="taskhound/img/but_wait_theres_more.jpeg" alt="But wait there's more meme" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/but_wait_theres_more.jpeg" alt="But wait there's more meme" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
             <h2>## extras</h2>
             <h3>### dpapi extraction</h3>
@@ -612,14 +617,14 @@
             <p>The PR has already been merged and ships by default in the <strong><a href="https://github.com/Adaptix-Framework/Extension-Kit/" target="_blank"><code>Extension-Kit v0.10</code></a></strong>.</p>
 
             <p style="text-align: center; margin: 1.5em 0;">
-                <img src="taskhound/img/taskhound_bof.png" alt="TaskHound BOF execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/taskhound_bof.png" alt="TaskHound BOF execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
 
 
             <p>For all pentests where stealth/OPSEC isn't that important or isn't a requirement: The PR for the matching <strong><a href="https://github.com/Pennyw0rth/NetExec/pull/933" target="_blank" style="color: #cba6f7;"><code>NetExec module</code></a></strong> is currently under review.</p>
 
             <p style="text-align: center; margin: 1.5em 0;"></p>
-                <img src="taskhound/img/netexec.png" alt="TaskHound NetExec execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
+                <img src="img/netexec.png" alt="TaskHound NetExec execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>    
             <h2>## limitations</h2>
             <p>As with pretty much everything that's fun, there are a few limitations with TaskHound too.</p>
@@ -828,8 +833,14 @@
             <h2>## outro</h2>
             <p style="font-style: italic; text-align: center; margin: 2em 0;">Please insert creative outro here.</p>
             <p style="font-style: italic; text-align: center;">It's 01:00 AM and my coffee is gone.</p>
+
+            <div style="background-color: #313244; border-left: 4px solid #cba6f7; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
+                <p style="margin: 0; color: #cba6f7; font-weight: bold;">Update: Part 2 is out!</p>
+                <p style="margin: 0.5em 0 0 0;">TaskHound got a major overhaul. Check out <a href="taskhound2.html" style="color: #89b4fa;">mod it till it breaks: How to build an overengineered SMB crawler on steroids</a> for multi-threading, LAPS integration, credential validation, and more.</p>
+            </div>
+
             <p style="text-align: center; margin: 2em 0;">
-                <img src="taskhound/img/skeletor.jpeg" alt="Skeletor meme" style="max-width: 100%; height: auto; border-radius: 5px; margin-top: 1em;">
+                <img src="img/skeletor.jpeg" alt="Skeletor meme" style="max-width: 100%; height: auto; border-radius: 5px; margin-top: 1em;">
             </p>
         </article>
     </main>
@@ -842,7 +853,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
-    <script src="../js/quotes.js"></script>
-    <script src="../js/footer.js"></script>
+    <script src="../../../js/quotes.js"></script>
+    <script src="../../../js/footer.js"></script>
 </body>
 </html>
