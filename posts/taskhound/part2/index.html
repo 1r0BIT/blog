@@ -22,6 +22,11 @@
             <h1>mod it 'til it breaks: taskhound 1.1.0 and the art of feature creep</h1>
             <p class="meta">Posted on January 2nd 2026 | ~18 min read</p>
 
+            <div style="background-color: #313244; border-left: 4px solid #f38ba8; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
+                <p style="margin: 0; color: #f38ba8; font-weight: bold;">EDIT (January 3rd 2026)</p>
+                <p style="margin: 0.5em 0 0 0;">So, uh, turns out my understanding of Windows Task Scheduler credential validation was... wrong. Spectacularly wrong. The credential validation section below has been updated. Long story short: I assumed Windows would <em>record</em> authentication failures. It doesn't. It just silently ignores them. The task doesn't run, and <code>LastRunInfo</code> stays unchanged from the last <em>successful</em> execution. Which means all those fancy return codes I was so proud of interpreting? You'll basically never see them via RPC. See the <a href="#credential-validation" style="color: #89b4fa;">updated section</a> for the actual heuristics we're using now. My bad.</p>
+            </div>
+
             <div class="prelude">
                 <h3># TL;DR</h3>
                 <p>Around three months ago, I released TaskHound with the bold claim that it would make hunting for privileged scheduled tasks less painful. Plot twist: I was wrong. It was still painful. Just differently. So I did what any reasonable person would do: locked myself in a room with too much caffeine, gave Copilot my wallet (bad decision), and rebuilt it into “TaskHound, but (maybe) actually useful this time.” This post is about what went wrong, what changed, and how something as boring as "name/identity resolution" resulted in severe gravitational anomalies in my basement that caused my keyboard to "fall" against the wall (multiple times).</p>
@@ -382,61 +387,26 @@ taskhound -u domain_user -p 'DomainPass!' -d corp.local --targets-file hosts.txt
 
             <p>The best part? It also leverages the same SQLite cache, so subsequent runs don't hammer your DC with LDAP queries. Your blue team will thank you. Or at least be slightly less annoyed.</p>
 
-            <h3>### trust but verify: credential validation</h3>
+            <h3 id="credential-validation">### trust but verify: credential validation</h3>
             <p>Here's the problem with stored credentials: they might be stale. The old code had exactly one reliable check: if <code>pwdLastChanged</code> from the account running the task was <em>older</em> than the task creation date. Considering how most mature environments handle credential rotation? Unlikely. Passwords rotate, tasks don't get updated, and you're left guessing.</p>
 
             <p>My initial idea was to query WMI for the task's last return code. Workable. But clunky and noisy as hell. Then Claude Opus suggested something I hadn't even considered: just check the Task Scheduler's own execution history. Windows already tracks whether credentials worked. We just need to ask.</p>
 
-            <p>TaskHound now queries the Task Scheduler RPC service to check if stored credentials are actually valid based on task execution history and return codes.</p>
+            <p>TaskHound now queries the Task Scheduler RPC service (<code>SchRpcGetLastRunInfo</code>) to check task execution history. Sounds simple, right? Here's where I screwed up in the original post:</p>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/task_rpc.py#L131-L205" target="_blank" style="color: #89b4fa;">taskhound/smb/task_rpc.py, lines 131-205</a></p>
+            <p><strong>I assumed Windows would record authentication failures.</strong></p>
 
-            <pre class="line-numbers"><code class="language-python">class TaskSchedulerRPC:
-    """Task Scheduler RPC client for querying task execution history."""
+            <p>It doesn't. If a task fails because the password is wrong, the account is locked, or the user lacks batch logon rights... Windows just goes "eh" and doesn't update <code>LastRunInfo</code>. The task silently doesn't run, and the last recorded execution remains whatever succeeded <em>before</em> the credentials went bad. This means:</p>
 
-    def connect(self) -> bool:
-        """Establish RPC connection to Task Scheduler service."""
-        binding = f"ncacn_np:{self.target}[\\pipe\\atsvc]"
-        rpc_transport = transport.DCERPCTransportFactory(binding)
-        rpc_transport.set_credentials(
-            self.username, self.password, self.domain,
-            self.lm_hash, self.nt_hash, self.aes_key,
-        )
+            <ul style="margin-left: 2em;">
+                <li>You can't tell the difference between "task hasn't triggered yet" and "task is failing every time because credentials are stale"</li>
+                <li>All those fancy return codes I documented? You'll basically never see them via RPC</li>
+                <li>A task showing <code>0x0</code> (success) from 6 months ago tells you the password was valid <em>then</em>, not <em>now</em></li>
+            </ul>
+            <p></p>
+            <p>So I had to get creative. TaskHound now uses heuristics combining RPC data with AD metadata (<code>pwdLastSet</code> from LDAP/BloodHound) and schedule analysis:</p>
 
-        # Enable Kerberos if requested (needed for AES key auth)
-        if self.kerberos or self.aes_key:
-            kdc_host = self.dc_ip or self.target
-            rpc_transport.set_kerberos(True, kdcHost=kdc_host)
-
-        self._dce = rpc_transport.get_dce_rpc()
-        # PKT_PRIVACY is REQUIRED - lower auth levels get access denied
-        self._dce.set_auth_level(RPC_C_AUTHN_LEVEL_PKT_PRIVACY)
-        if self.kerberos or self.aes_key:
-            self._dce.set_auth_type(RPC_C_AUTHN_GSS_NEGOTIATE)
-
-        self._dce.connect()
-        self._dce.bind(tsch.MSRPC_UUID_TSCHS)
-        return True
-
-    def get_task_run_info(self, task_path: str) -> Optional[TaskRunInfo]:
-        """Query last run information for a specific task."""
-        resp = tsch.hSchRpcGetLastRunInfo(self._dce, task_path)
-        last_run_time = resp["pLastRuntime"]
-        return_code = resp["pLastReturnCode"]
-
-        # Determine credential status from return code
-        cred_status, password_valid, hijackable, detail = (
-            self._interpret_return_code(return_code, last_run)
-        )
-        return TaskRunInfo(
-            task_path=task_path, last_run=last_run,
-            return_code=return_code, credential_status=cred_status,
-            password_valid=password_valid, task_hijackable=hijackable,
-        )</code></pre>
-
-            <p>The logic here is a bit sneaky: Windows validates the password <em>before</em> checking if the account has batch logon rights. So even if a task fails with "Logon type not granted" for example, we know the password is correct. The credentials are valid for other authentication scenarios, just not batch jobs.</p>
-
-            <p>The output now includes validation status:</p>
+            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/task_rpc.py" target="_blank" style="color: #89b4fa;">taskhound/smb/task_rpc.py</a></p>
 
             <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
                 <thead>
@@ -448,32 +418,41 @@ taskhound -u domain_user -p 'DomainPass!' -d corp.local --targets-file hosts.txt
                 </thead>
                 <tbody>
                     <tr>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>VALID</code></td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Credentials confirmed working, task can execute</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>CONFIRMED_VALID</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Password unchanged since task creation AND task ran within expected schedule</td>
                         <td style="padding: 0.75em; border: 1px solid #45475a;">Absolutely</td>
                     </tr>
                     <tr style="background-color: #181825;">
-                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>VALID (restricted)</code></td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Password correct but account restricted</td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Yes (just can't hijack the task)</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>HIGH_CONFIDENCE_VALID</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Password unchanged since task creation, but trigger timing unknown (e.g., boot trigger)</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Very likely</td>
                     </tr>
                     <tr>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>INVALID</code></td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Logon failure (wrong password)</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>LIKELY_VALID</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Password changed but task ran within schedule (creds updated), OR RPC-only mode with successful execution</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Probably</td>
+                    </tr>
+                    <tr style="background-color: #181825;">
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>POSSIBLY_STALE</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Task should have run but hasn't - may indicate stale credentials</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Maybe check first</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>DEFINITELY_STALE</code></td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Password changed after last successful run - credentials are guaranteed wrong</td>
                         <td style="padding: 0.75em; border: 1px solid #45475a;">Don't bother</td>
                     </tr>
                     <tr style="background-color: #181825;">
-                        <td style="padding: 0.75em; border: 1px solid #45475a;"><code>BLOCKED</code></td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Account disabled/locked/expired</td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Account's dead anyway</td>
-                    </tr>
-                    <tr>
                         <td style="padding: 0.75em; border: 1px solid #45475a;"><code>UNKNOWN</code></td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Task never ran, cannot determine</td>
-                        <td style="padding: 0.75em; border: 1px solid #45475a;">Maybe?</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Task has never run - cannot determine</td>
+                        <td style="padding: 0.75em; border: 1px solid #45475a;">Your guess is as good as mine</td>
                     </tr>
                 </tbody>
             </table>
+
+            <p>The key insight: comparing <code>pwdLastSet</code> from AD against <code>LastRunTime</code> from Task Scheduler tells us if the password changed <em>after</em> the last successful run. If it did? <code>DEFINITELY_STALE</code>. No guessing required.</p>
+
+            <p>Without AD data (e.g., <code>--no-ldap</code> and no BloodHound), TaskHound falls back to RPC-only mode. A successful execution within the expected trigger interval returns <code>LIKELY_VALID</code>. Not as confident, but better than nothing.</p>
 
             <div style="background-color: #313244; border-left: 4px solid #f9e2af; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
                 <p style="margin: 0; color: #f9e2af; font-weight: bold;">OPSEC Warning</p>
