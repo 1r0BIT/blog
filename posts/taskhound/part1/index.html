@@ -536,8 +536,7 @@
 
             <pre class="line-numbers"><code class="language-sql">// Find all computers that have ScheduledTasks with stored credentials 
 // and the user context they run as
-    MATCH p = (c:Computer)-[:HasTaskWithStoredCreds]->(t:ScheduledTask)-[:RunsAs]->(u)
-    RETURN p</code></pre>
+    MATCH p = (:Computer)-[:HasTaskWithStoredCreds]->(:ScheduledTask)-[:RunsAs]->(:User) RETURN p LIMIT 1000</code></pre>
 
             <p> This will (hopefully) result in something like this:</p>
                         <p style="text-align: center; margin: 1.5em 0;">
