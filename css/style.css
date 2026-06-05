@@ -1,8 +1,11 @@
-/* Import pixelated fonts */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+/* Self-hosted GNU Unifont — bitmap woff, no AA-optimized hinting */
+@font-face {
+    font-family: 'unifont';
+    src: url('../fonts/unifont.woff') format('woff');
+    font-display: swap;
+}
 
-/* Import Prism.js theme - customized for Catppuccin */
+/* Import Prism.js theme - customized for Synthwave '84 */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css');
 
 /* Reset and base styles */
@@ -13,27 +16,25 @@
 }
 
 body {
-    background-color: #1e1e2e; /* Catppuccin Mocha Base */
-    color: #cdd6f4; /* Catppuccin Mocha Text */
-    font-family: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Menlo', monospace;
-    font-size: 14px;
-    line-height: 1.7;
+    background-color: #241b2f; /* Synthwave '84 Base */
+    color: #e0d3f5; /* Synthwave '84 Text */
+    font-family: 'unifont', 'lucida console', monospace, Monaco;
+    font-size: 18px;
+    line-height: 1.3;
+    letter-spacing: 0.2px;
     padding: 20px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
 }
 
 /* Container */
 .container {
-    max-width: 900px;
+    max-width: 960px;
     margin: 0 auto;
     padding: 40px 20px;
 }
 
 /* ASCII Logo */
 .ascii-logo {
-    color: #a6e3a1; /* Catppuccin Mocha Green */
+    color: #36f9f6; /* Synthwave '84 Cyan */
     font-size: 12px;
     line-height: 1.2;
     margin: 0;
@@ -48,8 +49,9 @@ body {
 }
 
 .quote-display {
-    background: #1e1e2e;
-    color: #a6e3a1;
+    background: #241b2f;
+    color: #36f9f6;
+    font-family: 'unifont', 'lucida console', monospace, Monaco;
     padding-top: 30px;
     padding-bottom: 30px;
     text-align: center;
@@ -71,113 +73,163 @@ nav {
     text-align: center;
     margin-bottom: 50px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+    border-bottom: 1px solid #495495; /* Synthwave '84 Surface1 */
 }
 
 nav p {
-    color: #6c7086; /* Catppuccin Mocha Overlay0 */
+    color: #495495; /* Synthwave '84 Comment */
 }
 
 nav a {
-    color: #89b4fa; /* Catppuccin Mocha Blue */
+    color: #ff7edb; /* Synthwave '84 Pink */
     text-decoration: none;
     transition: color 0.2s;
 }
 
 nav a:hover {
-    color: #a6e3a1; /* Catppuccin Mocha Green */
+    color: #36f9f6; /* Synthwave '84 Cyan */
     text-decoration: underline;
 }
 
 /* Typography */
 h1 {
-    color: #cdd6f4; /* Catppuccin Mocha Text */
-    font-size: 28px;
+    color: #e0d3f5; /* Synthwave '84 Text */
+    font-size: 37.3px;
     font-weight: normal;
-    margin-bottom: 40px;
+    margin: 40px 0 15px 0;
     text-align: center;
 }
 
 h2 {
-    color: #a6e3a1; /* Catppuccin Mocha Green */
-    font-size: 22px;
+    color: #36f9f6; /* Synthwave '84 Cyan */
+    font-size: 31.1px;
     font-weight: bold;
-    margin: 40px 0 20px 0;
+    margin: 40px 0 15px 0;
 }
 
 h3 {
-    color: #f9e2af; /* Catppuccin Mocha Yellow */
-    font-size: 18px;
+    color: #fede5d; /* Synthwave '84 Yellow */
+    font-size: 25.9px;
     font-weight: bold;
-    margin: 30px 0 15px 0;
+    margin: 30px 0 11px 0;
 }
 
 h4 {
-    color: #89b4fa; /* Catppuccin Mocha Blue */
-    font-size: 16px;
+    color: #ff7edb; /* Synthwave '84 Pink */
+    font-size: 21.6px;
     font-weight: bold;
-    margin: 25px 0 12px 0;
+    margin: 24px 0 9px 0;
 }
 
 p {
-    margin-bottom: 15px;
-    color: #bac2de; /* Catppuccin Mocha Subtext1 */
+    margin-bottom: 19px;
+    color: #b893ce; /* Synthwave '84 Subtext1 */
 }
 
 /* Links */
 a {
-    color: #89b4fa; /* Catppuccin Mocha Blue */
+    color: #ff7edb; /* Synthwave '84 Pink */
     text-decoration: none;
 }
 
 a:hover {
-    color: #a6e3a1; /* Catppuccin Mocha Green */
+    color: #36f9f6; /* Synthwave '84 Cyan */
     text-decoration: underline;
 }
 
-/* Lists */
-ul.post-list {
-    list-style: none;
-    margin: 20px 0;
-}
-
-ul.post-list li {
-    margin: 12px 0;
-    padding-left: 10px;
-}
+/* Lists — handled by the unified main ul/ol rule below */
 
 .date {
-    color: #6c7086; /* Catppuccin Mocha Overlay0 */
+    color: #495495; /* Synthwave '84 Comment */
     margin-right: 10px;
+}
+
+.venue {
+    color: #fede5d; /* Synthwave '84 Yellow */
+}
+
+/* Main content lists — ASCII-styled bullets to match the terminal theme.
+   Covers posts (article), homepage, toolshed, talks, whoami, posts.html — anything inside <main>. */
+main ul,
+main ol {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 19px 0; /* match paragraph bottom margin */
+}
+
+main ul li,
+main ol li {
+    margin: 0 0 10px 0;
+    padding-left: 1.5em;
+    position: relative;
+}
+
+main ul li::before {
+    content: "> ";
+    position: absolute;
+    left: 0;
+    color: #36f9f6; /* Synthwave '84 Cyan */
+    font-weight: bold;
+}
+
+main ol {
+    counter-reset: list-counter;
+}
+
+main ol li {
+    counter-increment: list-counter;
+}
+
+main ol li::before {
+    content: counter(list-counter) ". ";
+    position: absolute;
+    left: 0;
+    color: #36f9f6; /* Synthwave '84 Cyan */
+    font-weight: bold;
+}
+
+/* Nested lists — tighter spacing so sub-bullets sit close to their parent */
+main ul ul,
+main ul ol,
+main ol ul,
+main ol ol {
+    margin: 8px 0 0 0;
+}
+
+/* Sub-bullets get a different marker — distinguishes nesting at a glance */
+main ul ul li::before {
+    content: "+ ";
+    color: #fede5d; /* Synthwave '84 Yellow */
 }
 
 /* Sections */
 section {
-    margin: 50px 0;
+    margin: 28px 0;
 }
 
 .prelude {
-    background-color: #181825; /* Catppuccin Mocha Mantle */
+    background-color: #1a1426; /* Synthwave '84 Mantle */
     padding: 25px;
-    border-left: 3px solid #a6e3a1; /* Catppuccin Mocha Green */
+    border-left: 3px solid #36f9f6; /* Synthwave '84 Cyan */
     margin: 30px 0;
 }
 
 /* Code blocks */
 pre {
-    background-color: #1e1e2e;
-    border: 1px solid #313244;
+    background-color: #241b2f;
+    border: 1px solid #2a2139;
     border-radius: 5px;
+    font-family: 'unifont', 'lucida console', monospace, Monaco;
     padding: 15px;
     overflow-x: auto;
     overflow-y: auto;
     max-height: 500px;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1.5;
 }
 
 pre[class*="language-"] {
-    background-color: #181825 !important;
+    background-color: #1a1426 !important;
     margin: 20px 0;
     padding: 15px !important;
     overflow-x: auto;
@@ -199,21 +251,19 @@ pre.short {
 }
 
 code {
-    background-color: #313244; /* Catppuccin Mocha Surface0 */
-    color: #a6e3a1; /* Catppuccin Mocha Green */
+    background-color: #2a2139; /* Synthwave '84 Surface0 */
+    color: #36f9f6; /* Synthwave '84 Cyan */
     padding: 2px 6px;
     border-radius: 3px;
-    font-family: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', 'Consolas', monospace;
-    font-size: 13px;
-    -webkit-font-smoothing: antialiased !important;
-    -moz-osx-font-smoothing: grayscale !important;
+    font-family: 'unifont', 'lucida console', monospace, Monaco;
+    font-size: 15px;
 }
 
 pre code {
     background-color: transparent !important;
     padding: 0;
     display: block;
-    color: #cdd6f4 !important;
+    color: #e0d3f5 !important;
     white-space: pre;
 }
 
@@ -237,7 +287,7 @@ pre.line-numbers > code {
     left: -3.8em;
     width: 3em;
     letter-spacing: -1px;
-    border-right: 1px solid #45475a;
+    border-right: 1px solid #495495;
     user-select: none;
     text-shadow: none !important;
 }
@@ -250,23 +300,23 @@ pre.line-numbers > code {
 
 .line-numbers-rows > span:before {
     content: counter(linenumber);
-    color: #6c7086;
+    color: #495495;
     display: block;
     padding-right: 0.8em;
     text-align: right;
     text-shadow: none !important;
 }
 
-/* Custom Catppuccin syntax highlighting colors */
+/* Custom Synthwave '84 syntax highlighting colors */
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata {
-    color: #6c7086 !important; /* Catppuccin Mocha Overlay0 */
+    color: #495495 !important; /* Synthwave '84 Comment */
 }
 
 .token.punctuation {
-    color: #bac2de !important; /* Catppuccin Mocha Subtext1 */
+    color: #b893ce !important; /* Synthwave '84 Subtext1 */
 }
 
 .token.property,
@@ -276,7 +326,7 @@ pre.line-numbers > code {
 .token.constant,
 .token.symbol,
 .token.deleted {
-    color: #fab387 !important; /* Catppuccin Mocha Peach */
+    color: #f97e72 !important; /* Synthwave '84 Coral */
 }
 
 .token.selector,
@@ -285,7 +335,7 @@ pre.line-numbers > code {
 .token.char,
 .token.builtin,
 .token.inserted {
-    color: #a6e3a1 !important; /* Catppuccin Mocha Green */
+    color: #36f9f6 !important; /* Synthwave '84 Cyan */
 }
 
 .token.operator,
@@ -293,24 +343,24 @@ pre.line-numbers > code {
 .token.url,
 .language-css .token.string,
 .style .token.string {
-    color: #89dceb !important; /* Catppuccin Mocha Sky */
+    color: #36f9f6 !important; /* Synthwave '84 Cyan */
 }
 
 .token.atrule,
 .token.attr-value,
 .token.keyword {
-    color: #cba6f7 !important; /* Catppuccin Mocha Mauve */
+    color: #ae81ff !important; /* Synthwave '84 Purple */
 }
 
 .token.function,
 .token.class-name {
-    color: #89b4fa !important; /* Catppuccin Mocha Blue */
+    color: #ff7edb !important; /* Synthwave '84 Pink */
 }
 
 .token.regex,
 .token.important,
 .token.variable {
-    color: #f9e2af !important; /* Catppuccin Mocha Yellow */
+    color: #fede5d !important; /* Synthwave '84 Yellow */
 }
 
 .token.important,
@@ -328,10 +378,10 @@ pre.line-numbers > code {
 
 /* Blockquotes */
 blockquote {
-    border-left: 3px solid #f9e2af; /* Catppuccin Mocha Yellow */
+    border-left: 3px solid #fede5d; /* Synthwave '84 Yellow */
     padding-left: 20px;
     margin: 20px 0;
-    color: #a6adc8; /* Catppuccin Mocha Subtext0 */
+    color: #b893ce; /* Synthwave '84 Subtext0 */
     font-style: italic;
 }
 
@@ -344,21 +394,21 @@ table {
 
 table th,
 table td {
-    border: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+    border: 1px solid #495495; /* Synthwave '84 Surface1 */
     padding: 10px;
     text-align: left;
 }
 
 table th {
-    background-color: #313244; /* Catppuccin Mocha Surface0 */
-    color: #a6e3a1; /* Catppuccin Mocha Green */
+    background-color: #2a2139; /* Synthwave '84 Surface0 */
+    color: #36f9f6; /* Synthwave '84 Cyan */
 }
 
 /* Footer */
 footer {
     margin-top: 80px;
     text-align: center;
-    color: #585b70; /* Catppuccin Mocha Surface2 */
+    color: #6e5cae; /* Synthwave '84 Surface2 */
     font-size: 12px;
 }
 
@@ -372,25 +422,25 @@ img {
     height: auto;
     display: block;
     margin: 20px auto;
-    border: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+    border: 1px solid #495495; /* Synthwave '84 Surface1 */
 }
 
 /* Horizontal rule */
 hr {
     border: none;
-    border-top: 1px solid #45475a; /* Catppuccin Mocha Surface1 */
+    border-top: 1px solid #495495; /* Synthwave '84 Surface1 */
     margin: 40px 0;
 }
 
 /* Selection */
 ::selection {
-    background-color: #a6e3a1; /* Catppuccin Mocha Green */
-    color: #1e1e2e; /* Catppuccin Mocha Base */
+    background-color: #36f9f6; /* Synthwave '84 Cyan */
+    color: #241b2f; /* Synthwave '84 Base */
 }
 
 ::-moz-selection {
-    background-color: #a6e3a1; /* Catppuccin Mocha Green */
-    color: #1e1e2e; /* Catppuccin Mocha Base */
+    background-color: #36f9f6; /* Synthwave '84 Cyan */
+    color: #241b2f; /* Synthwave '84 Base */
 }
 
 /* Scrollbar */
@@ -400,16 +450,16 @@ hr {
 }
 
 ::-webkit-scrollbar-track {
-    background: #1e1e2e; /* Catppuccin Mocha Base */
+    background: #241b2f; /* Synthwave '84 Base */
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #45475a; /* Catppuccin Mocha Surface1 */
+    background: #495495; /* Synthwave '84 Surface1 */
     border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #585b70; /* Catppuccin Mocha Surface2 */
+    background: #6e5cae; /* Synthwave '84 Surface2 */
 }
 
 /* Responsive */
@@ -427,17 +477,33 @@ hr {
     }
     
     h1 {
-        font-size: 18px;
+        font-size: 22px;
     }
-    
+
     h2 {
-        font-size: 16px;
+        font-size: 19px;
+    }
+
+    h3 {
+        font-size: 17px;
+    }
+
+    h4 {
+        font-size: 15px;
+    }
+
+    code {
+        font-size: 12px;
+    }
+
+    pre {
+        font-size: 12px;
     }
 }
 
-/* Clean Prism.js syntax highlighting - Catppuccin Mocha */
+/* Clean Prism.js syntax highlighting - Synthwave '84 */
 .token { 
-    color: #cdd6f4 !important;
+    color: #e0d3f5 !important;
     text-shadow: none !important;
 }
 
@@ -446,55 +512,55 @@ hr {
 .token.prolog,
 .token.doctype,
 .token.cdata { 
-    color: #6c7086 !important; 
+    color: #495495 !important; 
     text-shadow: none !important; 
 }
 
 /* Punctuation and operators - keep them neutral */
 .token.punctuation,
 .token.operator { 
-    color: #cdd6f4 !important; 
+    color: #e0d3f5 !important; 
     text-shadow: none !important; 
 }
 
 /* Strings and values */
 .token.string,
 .token.attr-value { 
-    color: #a6e3a1 !important; 
+    color: #36f9f6 !important; 
     text-shadow: none !important; 
 }
 
 /* Keywords */
 .token.keyword,
 .token.builtin { 
-    color: #cba6f7 !important; 
+    color: #ae81ff !important; 
     text-shadow: none !important; 
 }
 
 /* Numbers and booleans */
 .token.number,
 .token.boolean { 
-    color: #fab387 !important; 
+    color: #f97e72 !important; 
     text-shadow: none !important; 
 }
 
 /* Functions and methods */
 .token.function,
 .token.class-name { 
-    color: #89b4fa !important; 
+    color: #ff7edb !important; 
     text-shadow: none !important; 
 }
 
 /* Properties and attributes */
 .token.property,
 .token.attr-name { 
-    color: #fab387 !important; 
+    color: #f97e72 !important; 
     text-shadow: none !important; 
 }
 
 /* Variables and identifiers */
 .token.variable { 
-    color: #cdd6f4 !important; 
+    color: #e0d3f5 !important; 
     text-shadow: none !important; 
 }
 
@@ -515,7 +581,7 @@ code *,
 /* Nuclear option: Force all code content to use consistent colors */
 pre[class*="language-"] *,
 code[class*="language-"] * {
-    color: #cdd6f4 !important;
+    color: #e0d3f5 !important;
     text-shadow: none !important;
 }
 
@@ -532,6 +598,6 @@ code[class*="language-"] * {
 .token.rule,
 .token.deleted,
 .token.inserted {
-    color: #cdd6f4 !important;
+    color: #e0d3f5 !important;
     text-shadow: none !important;
 }

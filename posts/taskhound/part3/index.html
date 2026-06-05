@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>closing a chapter: SO-CON, taskhound updates and more microsoft shenanigans.</title>
+    <link rel="stylesheet" href="../../../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div id="quote-container"></div>
+        </header>
+
+        <nav>
+            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../talks.html">talks</a> | <a href="../../../whoami.html">whoami</a> ]</p>
+        </nav>
+
+        <main>
+        <article>
+            <h1>closing a chapter: SO-CON, taskhound updates and more microsoft shenanigans.</h1>
+            <p class="meta">Posted on May 14th 2026 | ~13 min read</p>
+
+            <div class="prelude">
+                <h3># TL;DR</h3>
+                <p>I promise this is the last TaskHound blog post. Three threads in one: what happened at SO-CON 2026 (my first ever conference talk), complete with imposter syndrome and a wireguard meltdown mid-demo. TaskHound updates since Part 2 (service enumeration and a new BloodHound edge); and the story of the "TaskHound bug" that turned out to be Microsoft's own example pages quietly disagreeing with the spec for two decades.</p>
+                <p>Also: the talk is <a href="https://www.youtube.com/watch?v=t7OeggV4OdU" target="_blank">up on YouTube</a>, and I rambled about how TaskHound came to be on the <a href="https://www.youtube.com/watch?v=g8OTyPHk_X0" target="_blank">Know Your Adversary podcast</a> over at SpecterOps.</p>
+            </div>
+
+            <h2>## previously on taskhound...</h2>
+            <p>If you haven't been here before: <a href="../part1/index.html">Part 1</a> introduced the tool. <a href="../part2/index.html">Part 2</a> rebuilt it from the ground up after the first release disassembled itself the moment it touched real corporate environments. This post closes the trilogy. After this I promise to nag you about other things instead.</p>
+
+            <h2>## the talk: SO-CON 2026</h2>
+
+            <h3>### imposter syndrome, the genuine kind</h3>
+            <p>I always thought of myself as a reasonably charismatic lil' fella. Telling stories, getting laughs, not a problem. Then I got my SO-CON session approved and saw the speaker lineup. <a href="https://shenaniganslabs.io/" target="_blank">Elad Shamir</a> (<a href="https://twitter.com/elad_shamir" target="_blank">@elad_shamir</a>), <a href="https://blog.harmj0y.net/" target="_blank">Will Schroeder</a> (<a href="https://twitter.com/harmj0y" target="_blank">@harmj0y</a>), <a href="https://www.adminsdholder.com/" target="_blank">Jim Sykora</a> (<a href="https://x.com/JimSycurity" target="_blank">@JimSycurity</a>) and many more. Names I'd been reading research from for years. And then, somewhere on that list: me. The guy who randomly stumbled into infosec not even 5 years ago.</p>
+
+            <p>Not the everyday "am I good enough" flavour. The "did a misclick get me this slot" flavour.</p>
+
+            <p>I'd love to tell you that feeling went away once I got there. It didn't. Honestly? Still hasn't fully. But what did happen, and what caught me completely off guard, was the hospitality. The SO-CON crowd, speakers, specters, attendees, treated me like an equal. Not "the german dude with the small tool". Like a peer. That kind of welcome doesn't fix imposter syndrome but it does make it weirdly survivable.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/Impostor.png" alt="Impostor syndrome meme" style="max-width: 50%; height: auto; border-radius: 5px;">
+            </p>
+
+            <h3>### the opening line that landed</h3>
+            <p>I had a hunch the talk would either click or die within the first ninety seconds. So I led with the only claim that felt unimpeachable to me:</p>
+
+            <blockquote>"Ever since I started paying attention (and using TaskHound) my team has not had a single engagement where overprivileged or misconfigured scheduled tasks weren't a problem. Not a single one."</blockquote>
+
+            <p>That one landed cleanly. Heads nodded. That's the moment I knew the talk wasn't going to be a forty-minute exercise in pretending I belonged. The audience was with me. They've been there.</p>
+
+            <h3>### the demo gods strike (and then bless me)</h3>
+            <p>You know how every conference talk has that one slide where the speaker says <em>"DEMO TIME!"</em> and you can feel the crowd already grimacing on their behalf? Yeah.</p>
+
+            <p>My lab was supposed to be reachable over WireGuard. WireGuard apparently had other plans. Specifically: the conference venue's captive-portal Wi-Fi had very strong opinions about whether a UDP tunnel should be allowed to exist. (Spoiler: no. Not after sleep and re-waking the laptop) Just before the demo, the connection died. Everything I'd staged back home, the lab, the pre-saved queries, all of it... gone.</p>
+
+            <p>Overprepped as I was I had a fallback. A local lab on the presentation laptop. Albeit a bit smaller and the burner laptop clearly struggled to even host a single Windows server, but it worked... kind of. By some miracle it held together for the next ninety seconds. What I forgot: pre-saving the one cypher query I needed. So I'm standing there, in front of a live audience, with a working lab but no query.</p>
+
+            <p>Cool, cool, cool. We're just writing it live. No big deal.</p>
+
+            <p>I opened the cypher tab in BloodHound and felt like a caveman typing the query. Lo and behold, it worked first time! The audience even applauded. The thing that started as the demo gods striking down my lab ended up being the moment I felt somewhat confident up there. So: thank you, captive-portal Wi-Fi. You shouldn't exist, but in this one specific instance, you made me look better than I deserved.</p>
+
+            <h2>## prep time</h2>
+
+            <h3>### the original outline was a rant</h3>
+            <p>I started prepping in January. The working title was nothing to be proud of and will not be named here but accurately described my emotional state at the time. The outline had thirty-ish slides of unfiltered grievance against Microsoft identity resolution. Comedy beats, Memes and the likes. </p>
+
+            <p>It would have been a fun rant over a beer or two. It would not have been a good talk.</p>
+
+            <p>What turned it from rant into talk was my mentor and specter <a href="https://medium.com/@jonasblowknudsen" target="_blank">Jonas Bülow Knudsen</a> (<a href="https://twitter.com/Jonas_B_K" target="_blank">@Jonas_B_K</a>). Over multiple QA rounds, he helped me to reshape the talk into something that wouldn't just cause laughter but actually teach something. If you happen to read this: Thank you! Seriously, you rock!</p>
+
+            <p>Same energy to <a href="https://github.com/hunterino-sec" target="_blank">Hunter</a> (<a href="https://twitter.com/hunterinosec" target="_blank">@hunterinosec</a>) for always listening to my ramblings, reviewing slides, and sitting through rehearsals without his ears bleeding (or at least not admitting it lol). Awesome dude, and one of the few people I'd actually consider something that resembles a friend in this space.</p>
+
+            <h3>### overprepped, gloriously</h3>
+            <p>Aside from the demo blooper, everything else landed roughly as rehearsed. Which is sus, because in my head this session was going to derail in a dozen creative ways and I'd be lucky to survive any of them. The truth is I was so overprepped that there was almost no scenario the rehearsal didn't cover. Every meme had a timer. Every fallback had a fallback.</p>
+
+            <p>People will tell you not to overprep. I think they're wrong. Overprep. The buffer is what lets you survive the things you couldn't overprep for. Like, say... your VPN dying.</p>
+
+            <p>Unless you're a freestyling savant. One of the other SO-CON speakers casually told me: "I have a few talks next week. I have slides for... uhm... two, I guess?" Built different. The rest of us should overprep.</p>
+
+            <h2>## the seed jonas planted</h2>
+
+            <p>In the final QA session, Jonas (yes, the same one) hit me with this gem:</p>
+
+            <blockquote>"TaskHound is really cool. But have you thought about doing the same for services?"</blockquote>
+
+            <p>My initial reaction was, and I quote, <em>STOP PLANTING IDEAS IN MY HEAD REEEEEEE</em>. A week later, of course, I was in a branch called <code>feature/service-enumeration</code>. Because that's how this works.</p>
+
+            <p>And with this: Welcome to what happened to TaskHound since Part2 (Still no modularization, sorry!)</p>
+
+            <h2>## services: same attack surface, different hat</h2>
+
+            <p>Quick note before the deep-dive: the value here isn't credential extraction. <code>secretsdump</code> handles that part fine and you don't need TaskHound for it. The value is <strong>what the credentials are sitting under</strong>: an enterprise service running as a domain account, often privileged, often undocumented, frequently forgotten by whoever set it up. Map them across an engagement and you have an attack surface similar to the one exposed with SchedTasks.</p>
+
+            <p>TaskHound is already touching the LSA (it needs <code>DPAPI_SYSTEM</code> to decrypt task creds), so grabbing service-backed LSA secrets while we're there is essentially free. But the <em>interesting</em> data (which services run as which domain account on which host) doesn't come from LSA at all. It comes from the Service Control Manager over SMB. LSA is where we go for the password later, if we want it. The graph is the point.</p>
+
+            <h3>### how SVCCTL actually works (and why it hurts)</h3>
+            <p>The Service Control Manager exposes a remote interface over <code>\pipe\svcctl</code>. Same pipe <code>sc.exe</code> uses when you query a remote box. TaskHound binds to it on each target using the SMB connection that's already open, then walks a two-phase enumeration:</p>
+
+            <ul style="margin-left: 2em;">
+                <li><strong>Phase 1 <code>REnumServicesStatusW</code>:</strong> One RPC call. Returns every service on the host with its name, display name, current state, and service type. Crucially: <em>not</em> the account it runs as. Not the binary path.</li>
+                <li><strong>Phase 2 <code>RQueryServiceConfigW</code>:</strong> For every service you actually care about, open a per-service handle via <code>ROpenServiceW</code> and call <code>RQueryServiceConfigW</code> to get the full config. That's <em>two</em> RPC round-trips per service.</li>
+            </ul>
+
+            <p>Do the math. A default Windows 11 box has ~300 services. Phase 2 unfiltered means 600+ RPC calls per host. Multiply that by every host in the engagement. The first lab scan with service enumeration enabled took minutes. <em>Minutes.</em> In a five-box lab. You can imagine what that would look like in a real environment.</p>
+
+            <h3>### the 290-of-300 problem</h3>
+            <p>The good news is the noise is incredibly predictable. Of the ~300 services on a typical Windows box, ~290 of them run as one of:</p>
+
+            <ul style="margin-left: 2em;">
+                <li><code>LocalSystem</code> / <code>NT AUTHORITY\SYSTEM</code> and friends</li>
+                <li><code>NT AUTHORITY\LocalService</code> (and the space-separated and slash-separated variants)</li>
+                <li><code>NT AUTHORITY\NetworkService</code> (same dance)</li>
+                <li><code>NT SERVICE\*</code> virtual service accounts; one per service, no real credentials in LSA</li>
+                <li>Empty/null start name (defaults to LocalSystem anyway)</li>
+            </ul>
+
+            <p>So TaskHound now ships a static skip-list of well-known built-in service names plus a runtime filter that drops anything matching a built-in account principal and adds them to the cache to skip them for the next host. Local accounts get filtered too via SAMR enumeration of the host's local user database. What's left is the interesting set: unique services per host, all running as actual domain accounts or unrecognized identities that warrant a closer look.</p>
+
+            <h3>### showing it in BloodHound</h3>
+            <p>The findings ship as OpenGraph nodes and edges. Each enumerated service becomes a <code>WindowsService</code> node, the host gets a new <code>HasServiceWithStoredCreds</code> edge pointing at it, and the service node gets a <code>RunsAs</code> edge to whatever domain principal owns it (user, gMSA, MSA). One Cypher query gives you every service-account-on-domain-account relationship in the graph:</p>
+
+            <pre class="line-numbers"><code class="language-cypher">MATCH p = (:Computer)-[:HasServiceWithStoredCreds]-&gt;(:WindowsService)-[:RunsAs]-&gt;(:User)
+RETURN p
+LIMIT 1000</code></pre>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/services.png" alt="BloodHound graph: HasServiceWithStoredCreds and RunsAs edges from computers through services to domain accounts" style="max-width: 100%; height: auto; border-radius: 5px;">
+            </p>
+
+            <p>This turns answering the question "which services on which hosts could give me which domain accounts" from being something you grep for in a 300-line text dump to something you just look at. The targets in there are the ones worth the LSA round-trip.</p>
+
+            <h2>## the bug that wasn't: microsoft's 6th UserId</h2>
+
+            <h3>### the symptom</h3>
+            <p>For a long time (months to be fair) I had a recurring issue with TaskHound's output. Specifically, our consulting department (the people who get the engagement report and have to fix stuff we break together with the customer) kept telling me the same thing: some tasks were being flagged as TIER-0 that very clearly weren't running as a domain admin. They were running as <em>local</em> Administrator.</p>
+
+            <p>My initial workaround was a band-aid. I made an explicit decision: I'd rather flag a false-positive TIER-0 than skip a task and miss a potential privesc. So when TaskHound saw a bare unqualified username like <code>Administrator</code> in a task XML, no <code>.\</code> prefix, no domain prefix, no SID, it would assume the worst and tag it as TIER-0. Better to over-flag than miss. (This has since been changed and now resolves properly. But that's getting ahead of the story.)</p>
+
+            <p>What kept eating at me was: <em>why is this happening in the first place?</em> The <a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tsch/b9420a4c-fe40-45a0-ae85-2d57e051409b" target="_blank">MS-TSCH specification (&sect;2.5.6)</a> defines exactly <strong>five</strong> ways to specify a <code>UserId</code> in the <code>&lt;Principal&gt;</code> element (we already covered that earlier in the series, but here's a quick refresher):</p>
+
+            <table>
+                <thead>
+                    <tr><th>#</th><th>Format</th><th>Example</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>NetBIOS or FQDN <code>domain\username</code></td><td><code>CORP\svc_backup</code></td></tr>
+                    <tr><td>2</td><td>UPN <code>username@domain</code></td><td><code>svc_backup@corp.local</code></td></tr>
+                    <tr><td>3</td><td>Dot-local <code>.\username</code></td><td><code>.\localadmin</code></td></tr>
+                    <tr><td>4</td><td>Built-in service accounts</td><td><code>LOCAL SYSTEM</code>, <code>NETWORK SERVICE</code></td></tr>
+                    <tr><td>5</td><td>SID string</td><td><code>S-1-5-21-1234567890-...</code></td></tr>
+                </tbody>
+            </table>
+
+            <p>Five forms. Clearly documented. Explicitly listed. I built TaskHound's parser around exactly these five. So when production environments kept handing back this:</p>
+
+            <pre class="line-numbers"><code class="language-xml">&lt;Principals&gt;
+    &lt;Principal&gt;
+        &lt;UserId&gt;Administrator&lt;/UserId&gt;
+        &lt;LogonType&gt;InteractiveToken&lt;/LogonType&gt;
+    &lt;/Principal&gt;
+&lt;/Principals&gt;</code></pre>
+
+            <p>...I figured someone must've hand-edited an XML and not known better. Bare <code>Administrator</code>. No prefix. No suffix. No qualifier.</p>
+
+            <p>Surely admins were just being admins, right? This was just hand-rolled garbage.</p>
+
+            <p>Nope.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/wat.png" alt="Wat meme" style="max-width: 50%; height: auto; border-radius: 5px;">
+            </p>
+
+            <h3>### meet microsoft</h3>
+            <p>Buckle up. Microsoft's <em>own official Win32 documentation</em>, their <a href="https://learn.microsoft.com/en-us/windows/win32/taskschd/daily-trigger-example--xml-" target="_blank">Daily Trigger Example (XML)</a> page (among others), contains this:</p>
+
+            <pre class="line-numbers"><code class="language-xml">&lt;Principals&gt;
+    &lt;Principal&gt;
+        &lt;UserId&gt;Administrator&lt;/UserId&gt;
+        &lt;LogonType&gt;InteractiveToken&lt;/LogonType&gt;
+    &lt;/Principal&gt;
+&lt;/Principals&gt;</code></pre>
+
+            <p>That's right. The same Microsoft that wrote MS-TSCH &sect;2.5.6 listing five canonical forms is using a sixth, unlisted one in their own example code. Spec page enumerates the five and shows local identities with the explicit <code>.\</code> prefix. Example page on the same documentation site uses bare <code>Administrator</code>. Two doc pages, one team, one product, opposite advice. For about twenty years.</p>
+
+            <p>The C++ example on the sister page is even better. The official <a href="https://learn.microsoft.com/en-us/windows/win32/taskschd/daily-trigger-example--c---" target="_blank">Daily Trigger Example (C++)</a> ends with a credential prompt that prefills the username field with <code>TEXT("")</code>. Empty string. No <code>.\</code> hint. No <code>DOMAIN\</code> hint. Then it calls <code>CredUIPromptForCredentialsW</code> with three flags:</p>
+
+            <pre class="line-numbers"><code class="language-cpp">dwErr = CredUIPromptForCredentials(
+    &amp;cui, TEXT(""), NULL, 0,
+    pszName, CREDUI_MAX_USERNAME_LENGTH,
+    pszPwd,  CREDUI_MAX_PASSWORD_LENGTH,
+    &amp;fSave,
+    CREDUI_FLAGS_GENERIC_CREDENTIALS |
+    CREDUI_FLAGS_ALWAYS_SHOW_UI |
+    CREDUI_FLAGS_DO_NOT_PERSIST);</code></pre>
+
+            <p>And buried in the Remarks section of the <a href="https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-creduipromptforcredentialsw" target="_blank">official <code>CredUIPromptForCredentialsW</code> docs</a>:</p>
+
+            <blockquote>"If CREDUI_FLAGS_GENERIC_CREDENTIALS is specified and neither CREDUI_FLAGS_COMPLETE_USERNAME nor CREDUI_FLAGS_VALIDATE_USERNAME is specified, the typed name is not syntax checked in any way."</blockquote>
+
+            <p>The example uses the first flag and neither sibling. The credui prompt accepts whatever the admin types with no syntax check at the dialog. <code>RegisterTaskDefinition</code> <em>does</em> validate downstream: the username has to resolve through Windows' authentication stack via <code>LookupAccountName</code>, which for unqualified strings walks what Microsoft calls the "isolated-name" resolution chain (well-known SIDs first, then the local SAM, then the primary domain, then trusted domains). The password has to authenticate. Completely-bogus garbage fails registration with <code>ERROR_LOGON_FAILURE</code> before it touches disk (thank god). A typed <code>Administrator</code> though matches at step 2 (the local SAM), the password validates against the built-in, and the XML ends up with <code>&lt;UserId&gt;Administrator&lt;/UserId&gt;</code> on disk. No prefix, no qualifier. Bonus oddity: <code>SCHED_S_BATCH_LOGON_PROBLEM</code> is a <em>success</em> return code, so a task can be registered even when the principal lacks <code>SeBatchLogonRight</code> and will silently fail to start, meaning "registered" doesn't imply "runnable". I think when doing these steps via the GUI you get a little popup saying that the account needs at least batch logon rights. Doesn't seem to be the case here or depends on how you want to handle the return code.</p>
+
+            <h3>### the verdict</h3>
+            <p>Documentation inconsistency, not a runtime bug. Three pieces fail to line up. The spec (MS-TSCH &sect;2.5.6) lists exactly five valid <code>UserId</code> forms. The XSD schema backing that spec doesn't actually enforce them: <code>UserId</code> is <code>type="nonEmptyString"</code>, so <code>"lolomg"</code> would validate as XML just fine. And the runtime validator doesn't enforce them either: <code>LookupAccountName</code> accepts the bare isolated form via its standard resolution chain, which is exactly why Microsoft's own example XMLs use it. The spec's five-form list is documentation of intent, not a gate any layer of the system actually checks against. Has been this way since at least Vista.</p>
+
+            <h3>### being a petty german</h3>
+
+            <p>Two PRs to the <code>MicrosoftDocs/win32</code> repo:</p>
+
+            <ul style="margin-left: 2em;">
+                <li><a href="https://github.com/MicrosoftDocs/win32/pull/2169" target="_blank">PR #2169</a>: XML example now uses <code>.\Administrator</code>, intro sentence rewritten to make it explicit the task runs as the <em>local</em> account.</li>
+                <li><a href="https://github.com/MicrosoftDocs/win32/pull/2170" target="_blank">PR #2170</a>: C++ example swaps <code>CREDUI_FLAGS_GENERIC_CREDENTIALS</code> for <code>CREDUI_FLAGS_COMPLETE_USERNAME</code> (forces syntax validation), and the prompt now tells the user to enter a qualified name.</li>
+            </ul>
+
+            <p>Status: <strong>approved</strong> by a Microsoft maintainer. Who happens to be listed as <code>ms.author</code> on both of the target pages. So the page's listed author reviewed the fix, clicked Approve, and then (on both PRs, within seconds of clicking that button) posted this:</p>
+
+            <blockquote>"I don't have perms to complete this. :("</blockquote>
+
+            <p>Which is to say: the listed author of the affected pages agreed with the fix, formally approved it, and can't merge it. Not his fault, to be clear. Somewhere in Microsoft's permission structure the page author and the merge-button-holder are different humans, and I have a lot of sympathy for the guy who's listed as responsible for pages he apparently can't actually patch. I have left both PRs alone since. Not sure who escalates this and at this point I'm just enjoying the absurdity.</p>
+
+            <p>I have filed the entire situation under "things Microsoft will eventually correct as soon as someone with merge perms remembers this repo exists." Right next to "why does <code>schtasks</code> output different XML than <code>Export-ScheduledTask</code>?"</p>
+
+            <h3>### what TaskHound does now</h3>
+            <p>The original "flag it TIER-0 to be safe" behavior is gone. TaskHound now properly recognizes the isolated/bare name, resolves it the same way Windows does, and only tags it TIER-0 if the resolution actually lands on a TIER-0 principal. False positives that drove our consultants up the wall for months: fixed. The cost: a working knowledge of why Microsoft's documentation contradicts itself, which I will never be able to un-know.</p>
+
+            <h2>## is taskhound done?</h2>
+
+            <p>Probably not. I lie constantly about this.</p>
+
+            <p>There's still a backlog. The CLI modularization is still pending. Abuse-info integration with BloodHound nodes is half-finished and stuff keeps creeping up the priority queue when I'm sleep-deprived enough to think it sounds like a fun weekend.</p>
+
+            <p>That said: if you find a bug, file an issue. If you find a feature gap that hurts, file an issue. I will probably fix it. I always say I won't and then I always do. It's a problem.</p>
+
+            <h2>## thank-yous</h2>
+
+            <p>Closing this chapter means I owe a few people:</p>
+
+            <ul style="margin-left: 2em;">
+                <li><strong><a href="https://specterops.io" target="_blank">SpecterOps</a></strong> for inviting me to SO-CON in the first place, for OpenGraph as a platform, and for the kind of community where you can lose your mind in the Slack and get useful answers within ten minutes. A couple of specific call-outs:
+                    <ul>
+                        <li>Jonas, whose QA sessions turned a rant into a talk and whose offhand "have you considered services?" cost me weeks of my life. Worth it.</li>
+                        <li><a href="https://twitter.com/jaredcatkinson" target="_blank">Jared Atkinson</a>, <a href="https://x.com/justinkohler10" target="_blank">Justin Kohler</a>, and the crew who turned "my hotel randomly cancelled 48 hours before the flight" into "sorted, you're staying here" within a day. I've never seen a team move that fast on a problem that wasn't theirs. Thanks!</li>
+                    </ul>
+                </li>
+                <li><strong>The SO-CON attendees</strong> for treating a first-timer like a peer, asking good questions, and laughing at the right moments. Including the moment my VPN died and I had to freestyle stuff live. <em>Especially</em> that moment.</li>
+                <li><strong><a href="https://www.prosec-networks.com" target="_blank">ProSec</a></strong> for the room to grow, the support the moment my session got accepted, and being the kind of company that makes this work possible. Best gig in offsec.</li>
+                <li><strong>Caffeine</strong> as always.</li>
+            </ul>
+
+            <h2>## outro</h2>
+
+            <p>Still no catchphrase. Maybe by Part 4. (There won't be a Part 4. Probably.)</p>
+
+            <p><a href="https://github.com/1r0BIT/TaskHound" target="_blank">TaskHound</a> handles all six UserId forms now and can grab services if you like (and don't mind the SOC going bonkers). Go hunt creds :3.</p>
+
+            <p style="text-align: center; margin: 2em 0;">
+                <img src="img/skeletor.jpeg" alt="Skeletor meme" style="max-width: 50%; height: auto; border-radius: 5px;">
+            </p>
+
+        </article>
+    </main>
+
+    <footer></footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="../../../js/quotes.js"></script>
+    <script src="../../../js/footer.js"></script>
+</body>
+</html>

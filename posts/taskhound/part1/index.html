@@ -14,7 +14,7 @@
         </header>
 
         <nav>
-            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../whoami.html">whoami</a> ]</p>
+            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../talks.html">talks</a> | <a href="../../../whoami.html">whoami</a> ]</p>
         </nav>
 
         <main>
@@ -24,7 +24,7 @@
 
             <div style="background-color: #313244; border-left: 4px solid #f9e2af; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
                 <p style="margin: 0; color: #f9e2af; font-weight: bold;">⚠️ Heads up: Parts of this post are outdated!</p>
-                <p style="margin: 0.5em 0 0 0;">TaskHound has received a major update since this was written. Some features, CLI flags, and behaviors described here have changed. For the latest and greatest, check out <a href="../part2/index.html" style="color: #89b4fa;">Part 2: mod it till it breaks</a>.</p>
+                <p style="margin: 0.5em 0 0 0;">TaskHound has received a major update since this was written. Some features, CLI flags, and behaviors described here have changed. For the latest and greatest, check out <a href="../part2/index.html">Part 2: mod it till it breaks</a>.</p>
             </div>
 
             <div class="prelude">
@@ -147,7 +147,7 @@
             <h3>### core task enumeration</h3>
             <p>The task collection happens over SMB using Impacket:</p>
             
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/tasks.py#L42-L70" target="_blank" style="color: #89b4fa;">taskhound/smb/tasks.py, lines 42-70</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/tasks.py#L42-L70" target="_blank">taskhound/smb/tasks.py, lines 42-70</a></p>
 
             <pre class="line-numbers"><code class="language-python">def crawl_tasks(smb: SMBConnection, include_ms: bool = False) -> List[Tuple[str, bytes]]:
     # Recursively crawl the scheduled tasks tree and collect XMLs.
@@ -185,7 +185,7 @@
             <h3>### xml parsing logic</h3>
             <p>Each task XML gets parsed to extract the fields we care about for privilege analysis:</p>
             
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/parsers/task_xml.py#L12-L50" target="_blank" style="color: #89b4fa;">taskhound/parsers/task_xml.py, lines 12-50</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/parsers/task_xml.py#L12-L50" target="_blank">taskhound/parsers/task_xml.py, lines 12-50</a></p>
 
             <pre class="line-numbers"><code class="language-python">def parse_task_xml(xml_bytes: bytes) -> Dict[str, str]:
     res = {"runas": None, "author": None, "date": None, "command": None, "arguments": None, "logon_type": None, "enabled": None,
@@ -341,7 +341,7 @@
 
             <h3>### enter: opengraph</h3>
             <p>You can't imagine how long I've dreamed of something like this. BloodHound's ability to visualize complex Active Directory relationships was already a game changer. But being able to create custom nodes and edges without jumping through hoops? And making it accessible to others without <em>them</em> having to jump through the same hoops? That's just <em>priceless</em>.</p>
-            <p>TaskHound uses the official <a href="https://pypi.org/project/bhopengraph/" target="_blank" style="color: #cba6f7;"><code>bhopengraph</code></a> library by <a href="https://github.com/p0dalirius" target="_blank" style="color: #cba6f7;">@p0dalirius</a> to generate type-safe, schema-validated graph data:</p>
+            <p>TaskHound uses the official <a href="https://pypi.org/project/bhopengraph/" target="_blank"><code>bhopengraph</code></a> library by <a href="https://github.com/p0dalirius" target="_blank">@p0dalirius</a> to generate type-safe, schema-validated graph data:</p>
             <p>For now, we add the following new node and edge types to the BloodHound schema:</p>
             
             <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
@@ -378,7 +378,7 @@
 
             <p>Here's how the nodes and edges get generated from the SchedTask data:</p>
             
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L273-L320" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 273-320</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L273-L320" target="_blank">taskhound/output/opengraph.py, lines 273-320</a></p>
 
             <pre class="line-numbers"><code class="language-python">def generate_opengraph_files(output_dir: str, tasks: List[Dict],
                             bh_api_url: Optional[str] = None,
@@ -420,7 +420,7 @@
 
             <p>The actual node creation with all the properties happens in the <code>_create_task_node</code> helper function:</p>
             
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L409-L506" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 409-506</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L409-L506" target="_blank">taskhound/output/opengraph.py, lines 409-506</a></p>
 
             <pre class="line-numbers"><code class="language-python">def _create_task_node(task: Dict) -> Node:
     """
@@ -472,7 +472,7 @@
                 <p style="margin: 0.5em 0 0 0;">One hurdle was the correct object ID resolution. Since the unique identifier used to be the SID as far as I remember (in Legacy BloodHound), I thought it would be the same for BHCE. Well. I was wrong. BHCE uses an internal node_id, which we need to get from the API before we can successfully map it. This is still a work in progress and will be fixed eventually. More on that in the Roadmap section.</p>
             </div>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L66-L130" target="_blank" style="color: #89b4fa;">taskhound/output/opengraph.py, lines 66-130</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/opengraph.py#L66-L130" target="_blank">taskhound/output/opengraph.py, lines 66-130</a></p>
 
             <pre class="line-numbers"><code class="language-python">def resolve_object_ids_chunked(
     computer_names: Set[str],
@@ -567,7 +567,7 @@ LIMIT 1000</code></pre>
             <h3>### dpapi extraction</h3>
             <p>Another neat convenience feature is automatic DPAPI credential extraction. Shoutout to <a href="https://x.com/xct_de">xct</a> for the suggestion. When TaskHound finds tasks with stored passwords, it can automatically dump and decrypt the credential blobs (Given that you acquired the DPAPI SYSTEM key somehow without making the SOC light up like a christmas tree). Of course you can also just grab the blobs and store them for later decryption. I would have loved to integrate some sort of association between blobs and their respective tasks without having to decrypt them first. But this is left as an exercise for the reader.</p>
             
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/dpapi/looter.py#L108-L140" target="_blank" style="color: #89b4fa;">taskhound/dpapi/looter.py, lines 108-140</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/dpapi/looter.py#L108-L140" target="_blank">taskhound/dpapi/looter.py, lines 108-140</a></p>
 
             <pre class="line-numbers"><code class="language-python">def _decrypt_all_credentials(self) -> None:
     """Download and decrypt all credential blobs from systemprofile"""
@@ -622,7 +622,7 @@ LIMIT 1000</code></pre>
             </p>
 
 
-            <p>For all pentests where stealth/OPSEC isn't that important or isn't a requirement: The PR for the matching <strong><a href="https://github.com/Pennyw0rth/NetExec/pull/933" target="_blank" style="color: #cba6f7;"><code>NetExec module</code></a></strong> is currently under review.</p>
+            <p>For all pentests where stealth/OPSEC isn't that important or isn't a requirement: The PR for the matching <strong><a href="https://github.com/Pennyw0rth/NetExec/pull/933" target="_blank"><code>NetExec module</code></a></strong> is currently under review.</p>
 
             <p style="text-align: center; margin: 1.5em 0;"></p>
                 <img src="img/netexec.png" alt="TaskHound NetExec execution demo" style="max-width: 100%; height: auto; border-radius: 5px;">
@@ -635,7 +635,7 @@ LIMIT 1000</code></pre>
 
                 <p>There's no timestamp of the last modification in the task XML, and unfortunately when the password in the task is changed, the file metadata doesn't change either.</p>
 
-                <p>One idea would be to, for example, pull the Windows event logs from disk or query them via WMI and search through the task history to compare the timestamp of the last successful execution. <span style="font-style: italic; color: #6c7086;">#OverEngineering</span></p>
+                <p>One idea would be to, for example, pull the Windows event logs from disk or query them via WMI and search through the task history to compare the timestamp of the last successful execution. <span style="font-style: italic; color: #495495;">#OverEngineering</span></p>
 
                 <p>If you have better ideas: Feel free to submit a pull request!</p>
             </div>
@@ -837,7 +837,7 @@ LIMIT 1000</code></pre>
 
             <div style="background-color: #313244; border-left: 4px solid #cba6f7; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
                 <p style="margin: 0; color: #cba6f7; font-weight: bold;">Update: Part 2 is out!</p>
-                <p style="margin: 0.5em 0 0 0;">TaskHound got a major overhaul. Check out <a href="taskhound2.html" style="color: #89b4fa;">mod it till it breaks: How to build an overengineered SMB crawler on steroids</a> for multi-threading, LAPS integration, credential validation, and more.</p>
+                <p style="margin: 0.5em 0 0 0;">TaskHound got a major overhaul. Check out <a href="taskhound2.html">mod it till it breaks: How to build an overengineered SMB crawler on steroids</a> for multi-threading, LAPS integration, credential validation, and more.</p>
             </div>
 
             <p style="text-align: center; margin: 2em 0;">

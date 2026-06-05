@@ -14,7 +14,7 @@
         </header>
 
         <nav>
-            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../whoami.html">whoami</a> ]</p>
+            <p>[ <a href="../../../index.html">home</a> | <a href="../../../posts.html">posts</a> | <a href="../../../toolshed.html">toolshed</a> | <a href="../../../talks.html">talks</a> | <a href="../../../whoami.html">whoami</a> ]</p>
         </nav>
 
         <main>
@@ -24,7 +24,7 @@
 
             <div style="background-color: #313244; border-left: 4px solid #f38ba8; padding: 1em; margin: 1.5em 0; border-radius: 0 5px 5px 0;">
                 <p style="margin: 0; color: #f38ba8; font-weight: bold;">EDIT (January 3rd 2026)</p>
-                <p style="margin: 0.5em 0 0 0;">So, uh, turns out my understanding of Windows Task Scheduler credential validation was... wrong. Spectacularly wrong. The credential validation section below has been updated. Long story short: I assumed Windows would <em>record</em> authentication failures. It doesn't. It just silently ignores them. The task doesn't run, and <code>LastRunInfo</code> stays unchanged from the last <em>successful</em> execution. Which means all those fancy return codes I was so proud of interpreting? You'll basically never see them via RPC. See the <a href="#credential-validation" style="color: #89b4fa;">updated section</a> for the actual heuristics we're using now. My bad.</p>
+                <p style="margin: 0.5em 0 0 0;">So, uh, turns out my understanding of Windows Task Scheduler credential validation was... wrong. Spectacularly wrong. The credential validation section below has been updated. Long story short: I assumed Windows would <em>record</em> authentication failures. It doesn't. It just silently ignores them. The task doesn't run, and <code>LastRunInfo</code> stays unchanged from the last <em>successful</em> execution. Which means all those fancy return codes I was so proud of interpreting? You'll basically never see them via RPC. See the <a href="#credential-validation">updated section</a> for the actual heuristics we're using now. My bad.</p>
             </div>
 
             <div class="prelude">
@@ -33,7 +33,7 @@
             </div>
 
             <h2>## previously on taskhound...</h2>
-            <p>If you haven't read the <a href="../part1/index.html" style="color: #cba6f7;">original blog post</a>, here's the quick recap: TaskHound is a tool that hunts for Windows scheduled tasks running with privileged accounts and stored credentials. It connects via SMB, grabs task XMLs, parses them, and identifies high-value targets through BloodHound integration. The original version worked. Mostly. In lab environments. When the stars aligned.</p>
+            <p>If you haven't read the <a href="../part1/index.html">original blog post</a>, here's the quick recap: TaskHound is a tool that hunts for Windows scheduled tasks running with privileged accounts and stored credentials. It connects via SMB, grabs task XMLs, parses them, and identifies high-value targets through BloodHound integration. The original version worked. Mostly. In lab environments. When the stars aligned.</p>
 
             <p style="text-align: center; margin: 2em 0;">
                 <img src="img/it_works_on_my_machine.jpg" alt="It works on my machine meme" style="max-width: 50%; height: auto; border-radius: 5px;">
@@ -60,7 +60,7 @@
                 <img src="img/specterops.png" alt="SpecterOps Slack Screenshot" style="max-width: 100%; height: auto; border-radius: 5px;">
             </p>
 
-            <p>In scheduled task XMLs alone, there are <strong>five</strong> <a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tsch/d1058a28-7e02-4948-8b8d-4a347fa64931" target="_blank" style="color: #89b4fa;">documented</a> ways to specify a UserId:</p>
+            <p>In scheduled task XMLs alone, there are <strong>five</strong> <a href="https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tsch/d1058a28-7e02-4948-8b8d-4a347fa64931" target="_blank">documented</a> ways to specify a UserId:</p>
                 
             <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
                 <thead>
@@ -335,7 +335,7 @@ taskhound -u domain_user -p 'DomainPass!' -d corp.local --targets-file hosts.txt
 
             <p>Under the hood, TaskHound performs a two-phase connection for each target:</p>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/laps/query.py#L78-L145" target="_blank" style="color: #89b4fa;">taskhound/laps/query.py, lines 78-145</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/laps/query.py#L78-L145" target="_blank">taskhound/laps/query.py, lines 78-145</a></p>
 
             <pre class="line-numbers"><code class="language-python">def query_laps_passwords(
     dc_ip: str, domain: str, username: str, password: Optional[str] = None,
@@ -406,7 +406,7 @@ taskhound -u domain_user -p 'DomainPass!' -d corp.local --targets-file hosts.txt
             <p></p>
             <p>So I had to get creative. TaskHound now uses heuristics combining RPC data with AD metadata (<code>pwdLastSet</code> from LDAP/BloodHound) and schedule analysis:</p>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/task_rpc.py" target="_blank" style="color: #89b4fa;">taskhound/smb/task_rpc.py</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/task_rpc.py" target="_blank">taskhound/smb/task_rpc.py</a></p>
 
             <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0;">
                 <thead>
@@ -464,7 +464,7 @@ taskhound -u domain_user -p 'DomainPass!' -d corp.local --targets-file hosts.txt
 
             <p>TaskHound now checks for Credential Guard before you waste your time. It queries the remote registry for LSA protection settings (This was already implemented before but clearly experimental. It should work now. Emphasis on SHOULD)</p>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/credguard.py#L135-L185" target="_blank" style="color: #89b4fa;">taskhound/smb/credguard.py, lines 135-185</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/smb/credguard.py#L135-L185" target="_blank">taskhound/smb/credguard.py, lines 135-185</a></p>
 
             <pre class="line-numbers"><code class="language-python">def check_credential_guard(smb_conn, host) -> Optional[bool]:
     """
@@ -530,7 +530,7 @@ taskhound --offline-disk /mnt/evidence
 # Override hostname detection
 taskhound --offline-disk /mnt/disk --disk-hostname COMPROMISED-PC</code></pre>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/engine/disk_loader.py#L22-L28" target="_blank" style="color: #89b4fa;">taskhound/engine/disk_loader.py, lines 22-28</a> and <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/engine/disk_loader.py#L182-L225" target="_blank" style="color: #89b4fa;">lines 182-225</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/engine/disk_loader.py#L22-L28" target="_blank">taskhound/engine/disk_loader.py, lines 22-28</a> and <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/engine/disk_loader.py#L182-L225" target="_blank">lines 182-225</a></p>
 
             <pre class="line-numbers"><code class="language-python"># Windows paths relative to system root
 TASKS_PATH = "Windows/System32/Tasks"
@@ -586,7 +586,7 @@ taskhound -u homer -p 'Doh!123' -d corp.local --auto-targets -o plain,json,html<
 
             <p>The severity matrix is based on account type, stored credentials, and validation status:</p>
 
-            <p style="font-style: italic; color: #6c7086; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/html_report.py#L58-L75" target="_blank" style="color: #89b4fa;">taskhound/output/html_report.py, lines 58-75</a></p>
+            <p style="font-style: italic; color: #495495; margin: 0.5em 0;">Source: <a href="https://github.com/1r0BIT/TaskHound/blob/main/taskhound/output/html_report.py#L58-L75" target="_blank">taskhound/output/html_report.py, lines 58-75</a></p>
 
             <pre class="line-numbers"><code class="language-python">"""
 Severity Matrix:
@@ -758,9 +758,9 @@ ttl = 86400  # 24 hours</code></pre>
             <ul style="margin-left: 2em;">
                 <li>Everyone who provided feedback on Discord or GitHub</li>
                 <li>The folks who sent DMs with feature requests</li>
-                <li><strong><a href="https://github.com/Pennyw0rth/NetExec" target="_blank" style="color: #cba6f7;">NetExec</a></strong> for LAPS implementation inspiration</li>
-                <li><strong><a href="https://github.com/jborean93/dpapi-ng" target="_blank" style="color: #cba6f7;">dpapi-ng</a></strong> for making encrypted LAPS decryption possible</li>
-                <li>The absolute beasts from <strong><a href="https://specterops.io" target="_blank" style="color: #cba6f7;">SpecterOps</a></strong>! Not only for OpenGraph itself, but for the constant and instant support in the BloodHound Gang Slack</li>
+                <li><strong><a href="https://github.com/Pennyw0rth/NetExec" target="_blank">NetExec</a></strong> for LAPS implementation inspiration</li>
+                <li><strong><a href="https://github.com/jborean93/dpapi-ng" target="_blank">dpapi-ng</a></strong> for making encrypted LAPS decryption possible</li>
+                <li>The absolute beasts from <strong><a href="https://specterops.io" target="_blank">SpecterOps</a></strong>! Not only for OpenGraph itself, but for the constant and instant support in the BloodHound Gang Slack</li>
                 <li>Caffeine. Lots of caffeine.</li>
             </ul>
 

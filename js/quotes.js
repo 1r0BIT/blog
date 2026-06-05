@@ -39,12 +39,12 @@ function displayRandomQuote() {
     const quoteContainer = document.getElementById('quote-container');
     
     if (quoteContainer) {
-        // Check if we're on the index page
-        const isIndexPage = window.location.pathname.endsWith('index.html') || 
-                           window.location.pathname.endsWith('/') ||
-                           window.location.pathname === '/Blog/' ||
-                           window.location.pathname === '/Blog/index.html';
-        
+        // Index page = site root only. Post pages are also named index.html
+        // but live under /posts/ — exclude those so they get random quotes.
+        const path = window.location.pathname;
+        const isIndexPage = !path.includes('/posts/') &&
+                            (path.endsWith('index.html') || path.endsWith('/'));
+
         const quote = document.createElement('pre');
         quote.className = 'quote-display';
         quote.textContent = isIndexPage ? asciiLogo : getRandomQuote();
