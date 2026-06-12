@@ -148,6 +148,11 @@ a:hover {
     color: #fede5d; /* Synthwave '84 Yellow */
 }
 
+.login-note {
+    color: #495495; /* Synthwave '84 Comment */
+    font-size: 0.85em;
+}
+
 /* Main content lists — ASCII-styled bullets to match the terminal theme.
    Covers posts (article), homepage, toolshed, talks, whoami, posts.html — anything inside <main>. */
 main ul,
